@@ -51,7 +51,7 @@ func (p *MoodleProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 			},
 			"moodle_version": schema.StringAttribute{
 				Optional:    true,
-				Description: "Die Moodle-Version der Zielinstanz (z.B. \"4.3\").",
+				Description: "The Moodle version of the target instance (e.g. \"4.3\").",
 			},
 		},
 	}

@@ -25,28 +25,28 @@ func (c *MoodleClient) GetAllCourses() ([]Course, error) {
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return nil, fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler: %s", string(body))
+		return nil, fmt.Errorf("moodle API error: %s", string(body))
 	}
 
 	var courses []Course
 	err = json.Unmarshal(body, &courses)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen des JSON (ungültiges Format?): %w\nBody war: %s", err, string(body))
+		return nil, fmt.Errorf("error parsing JSON (invalid format?): %w\nBody was: %s", err, string(body))
 	}
 
 	return courses, nil

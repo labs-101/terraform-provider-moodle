@@ -49,8 +49,8 @@ func (r *sectionFileResource) Configure(_ context.Context, req resource.Configur
 	client, ok := req.ProviderData.(*moodle.MoodleClient)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unerwarteter Provider-Typ",
-			fmt.Sprintf("Erwartete *MoodleClient, bekam: %T. Bitte melde diesen Fehler.", req.ProviderData),
+			"Unexpected provider type",
+			fmt.Sprintf("Expected *MoodleClient, got: %T. Please report this error.", req.ProviderData),
 		)
 		return
 	}
@@ -60,32 +60,32 @@ func (r *sectionFileResource) Configure(_ context.Context, req resource.Configur
 
 func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Lädt eine lokale Datei zu Moodle hoch und verknüpft sie als Ressource mit einer Kurs-Sektion.",
+		Description: "Uploads a local file to Moodle and links it as a resource to a course section.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Die Course Module ID (cmID) des erstellten Ressource-Moduls in Moodle.",
+				Description: "The Course Module ID (cmID) of the created resource module in Moodle.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"course_id": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die ID des Kurses, zu dem die Datei hinzugefügt wird.",
+				Description: "The ID of the course to which the file is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"section_num": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die Sektionsnummer (Position im Kurs), zu der die Datei hinzugefügt wird.",
+				Description: "The section number (position in the course) to which the file is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"file_path": schema.StringAttribute{
 				Required:    true,
-				Description: "Relativer oder absoluter Pfad zur hochzuladenden Datei. Relative Pfade werden relativ zum Arbeitsverzeichnis aufgelöst.",
+				Description: "Relative or absolute path to the file to be uploaded. Relative paths are resolved relative to the working directory.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -93,7 +93,7 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"display_name": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Anzeigename der Datei in Moodle. Wenn nicht angegeben, wird der Dateiname verwendet.",
+				Description: "Display name of the file in Moodle. If not specified, the filename is used.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -101,14 +101,14 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"visible": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Sichtbarkeit der Datei (1 = sichtbar, 0 = verborgen). Standard: 1.",
+				Description: "Visibility of the file (1 = visible, 0 = hidden). Default: 1.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"file_hash": schema.StringAttribute{
 				Optional:    true,
-				Description: "MD5-Hash der Datei (z.B. filemd5(\"pfad/zur/datei\")). Änderungen erzwingen einen erneuten Upload.",
+				Description: "MD5 hash of the file (e.g. filemd5(\"path/to/file\")). Changes force a re-upload.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -125,7 +125,7 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Dateiname als Fallback für display_name
+	// Filename as fallback for display_name
 	filePath := plan.FilePath.ValueString()
 	displayName := plan.DisplayName.ValueString()
 	if plan.DisplayName.IsNull() || plan.DisplayName.IsUnknown() || displayName == "" {
@@ -137,19 +137,19 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 		visible = 1
 	}
 
-	// 1. Datei hochladen
+	// 1. Upload file
 	itemID, filename, err := r.client.UploadFile(filePath)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Hochladen der Datei", err.Error())
+		resp.Diagnostics.AddError("Error uploading file", err.Error())
 		return
 	}
 
-	// display_name: bevorzuge Benutzereingabe, Fallback auf hochgeladenen Dateinamen
+	// display_name: prefer user input, fallback to uploaded filename
 	if plan.DisplayName.IsNull() || plan.DisplayName.IsUnknown() || plan.DisplayName.ValueString() == "" {
 		displayName = filename
 	}
 
-	// 2. Datei mit Sektion verknüpfen
+	// 2. Link file to section
 	cmID, err := r.client.AddFileToSection(
 		plan.CourseID.ValueInt64(),
 		plan.SectionNum.ValueInt64(),
@@ -158,7 +158,7 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 		visible,
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Verknüpfen der Datei mit der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error adding file to section", err.Error())
 		return
 	}
 
@@ -179,11 +179,11 @@ func (r *sectionFileResource) Read(ctx context.Context, req resource.ReadRequest
 
 	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Lesen des Kurs-Moduls", err.Error())
+		resp.Diagnostics.AddError("Error reading course module", err.Error())
 		return
 	}
 
-	// Modul wurde extern gelöscht — State entfernen
+	// Module was deleted externally — remove state
 	if module == nil {
 		resp.State.RemoveResource(ctx)
 		return
@@ -195,8 +195,8 @@ func (r *sectionFileResource) Read(ctx context.Context, req resource.ReadRequest
 }
 
 func (r *sectionFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Alle veränderlichen Attribute haben RequiresReplace — Update wird nie aufgerufen.
-	// Trotzdem State setzen, damit Terraform konsistent bleibt.
+	// All mutable attributes have RequiresReplace — Update never called.
+	// Sets state anyway to keep Terraform consistent.
 	var plan sectionFileResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

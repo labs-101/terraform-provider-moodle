@@ -49,8 +49,8 @@ func (r *sectionChoiceResource) Configure(_ context.Context, req resource.Config
 	client, ok := req.ProviderData.(*moodle.MoodleClient)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unerwarteter Provider-Typ",
-			fmt.Sprintf("Erwartete *MoodleClient, bekam: %T. Bitte melde diesen Fehler.", req.ProviderData),
+			"Unexpected provider type",
+			fmt.Sprintf("Expected *MoodleClient, got: %T. Please report this error.", req.ProviderData),
 		)
 		return
 	}
@@ -60,32 +60,32 @@ func (r *sectionChoiceResource) Configure(_ context.Context, req resource.Config
 
 func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Erstellt eine Choice-Aktivität (Abstimmung) in einem Moodle-Kursabschnitt.",
+		Description: "Creates a Choice activity in a Moodle course section.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Die Course Module ID (cmID) der erstellten Choice-Aktivität.",
+				Description: "The Course Module ID (cmID) of the created Choice activity.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"course_id": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die ID des Kurses, zu dem die Choice hinzugefügt wird.",
+				Description: "The ID of the course to which the Choice is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"section_num": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die Sektionsnummer (0-basiert), zu der die Choice hinzugefügt wird.",
+				Description: "The section number (0-based) to which the Choice is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "Der Anzeigename der Choice-Aktivität.",
+				Description: "The display name of the Choice activity.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -93,7 +93,7 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"intro": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Beschreibungstext der Choice-Aktivität (HTML wird unterstützt).",
+				Description: "Description text of the Choice activity (HTML is supported).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -101,7 +101,7 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"options": schema.ListAttribute{
 				Required:    true,
 				ElementType: types.StringType,
-				Description: "Liste der Antwortmöglichkeiten (mindestens 2).",
+				Description: "List of options (at least 2).",
 				PlanModifiers: []planmodifier.List{
 					listRequiresReplace{},
 				},
@@ -109,7 +109,7 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"allow_multiple": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Ob Mehrfachauswahl erlaubt ist. Standard: false.",
+				Description: "Whether multiple selection is allowed. Default: false.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},
@@ -126,7 +126,7 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	// options aus types.List extrahieren
+	// extract options from types.List
 	var options []string
 	resp.Diagnostics.Append(plan.Options.ElementsAs(ctx, &options, false)...)
 	if resp.Diagnostics.HasError() {
@@ -145,7 +145,7 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 		allowMultiple,
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Erstellen der Choice-Aktivität", err.Error())
+		resp.Diagnostics.AddError("Error creating Choice activity", err.Error())
 		return
 	}
 
@@ -170,7 +170,7 @@ func (r *sectionChoiceResource) Read(ctx context.Context, req resource.ReadReque
 
 	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Lesen der Choice-Aktivität", err.Error())
+		resp.Diagnostics.AddError("Error reading Choice activity", err.Error())
 		return
 	}
 
@@ -184,7 +184,7 @@ func (r *sectionChoiceResource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *sectionChoiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Alle Attribute haben RequiresReplace — Update wird nie aufgerufen.
+	// All attributes have RequiresReplace — Update never called.
 	var plan sectionChoiceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

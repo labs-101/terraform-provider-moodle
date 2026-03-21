@@ -39,23 +39,23 @@ func (c *MoodleClient) AddAssignmentToSection(
 	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return 0, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return 0, fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return 0, fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return 0, fmt.Errorf("moodle API Fehler beim Erstellen des Assignments: %s", string(body))
+		return 0, fmt.Errorf("moodle API error creating assignment: %s", string(body))
 	}
 
 	var result struct {
@@ -63,7 +63,7 @@ func (c *MoodleClient) AddAssignmentToSection(
 		Visible bool  `json:"visible"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return 0, fmt.Errorf("fehler beim Parsen der API-Antwort: %w\nBody: %s", err, string(body))
+		return 0, fmt.Errorf("error parsing API response: %w\nBody: %s", err, string(body))
 	}
 
 	return result.CMID, nil

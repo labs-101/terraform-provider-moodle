@@ -70,8 +70,8 @@ func (d *coursesDataSource) Configure(ctx context.Context, req datasource.Config
 	client, ok := req.ProviderData.(*moodle.MoodleClient)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unerwarteter Provider-Typ",
-			"Erwartete *MoodleClient. Bitte melde diesen Fehler.",
+			"Unexpected provider type",
+			"Expected *MoodleClient. Please report this error.",
 		)
 		return
 	}
@@ -85,8 +85,8 @@ func (d *coursesDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	courses, err := d.client.GetAllCourses()
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Fehler beim Abrufen der Moodle-Kurse",
-			"Die Moodle API hat einen Fehler zurückgegeben: "+err.Error(),
+			"Error retrieving Moodle courses",
+			"The Moodle API returned an error: "+err.Error(),
 		)
 		return
 	}

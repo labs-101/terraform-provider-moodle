@@ -28,7 +28,7 @@ type uploadFileResponse struct {
 func (c *MoodleClient) UploadFile(filePath string) (int64, string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return 0, "", fmt.Errorf("fehler beim Öffnen der Datei %q: %w", filePath, err)
+		return 0, "", fmt.Errorf("error opening file %q: %w", filePath, err)
 	}
 	defer f.Close()
 
@@ -39,10 +39,10 @@ func (c *MoodleClient) UploadFile(filePath string) (int64, string, error) {
 
 	part, err := mw.CreateFormFile("file", filename)
 	if err != nil {
-		return 0, "", fmt.Errorf("fehler beim Erstellen des Multipart-Feldes: %w", err)
+		return 0, "", fmt.Errorf("error creating multipart field: %w", err)
 	}
 	if _, err = io.Copy(part, f); err != nil {
-		return 0, "", fmt.Errorf("fehler beim Lesen der Datei: %w", err)
+		return 0, "", fmt.Errorf("error reading file: %w", err)
 	}
 	mw.Close()
 
@@ -50,32 +50,32 @@ func (c *MoodleClient) UploadFile(filePath string) (int64, string, error) {
 
 	req, err := http.NewRequest("POST", uploadURL, &buf)
 	if err != nil {
-		return 0, "", fmt.Errorf("fehler beim Erstellen des Upload-Requests: %w", err)
+		return 0, "", fmt.Errorf("error creating upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return 0, "", fmt.Errorf("fehler beim Senden des Upload-Requests: %w", err)
+		return 0, "", fmt.Errorf("error sending upload request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return 0, "", fmt.Errorf("fehler beim Lesen der Upload-Antwort: %w", err)
+		return 0, "", fmt.Errorf("error reading upload response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return 0, "", fmt.Errorf("moodle Upload-Fehler: %s", string(body))
+		return 0, "", fmt.Errorf("moodle upload error: %s", string(body))
 	}
 
 	var uploads []uploadFileResponse
 	if err := json.Unmarshal(body, &uploads); err != nil {
-		return 0, "", fmt.Errorf("fehler beim Parsen der Upload-Antwort: %w\nBody: %s", err, string(body))
+		return 0, "", fmt.Errorf("error parsing upload response: %w\nBody: %s", err, string(body))
 	}
 
 	if len(uploads) == 0 {
-		return 0, "", fmt.Errorf("moodle hat keine Upload-Antwort zurückgegeben")
+		return 0, "", fmt.Errorf("moodle returned no upload response")
 	}
 
 	return uploads[0].ItemID, uploads[0].Filename, nil
@@ -94,23 +94,23 @@ func (c *MoodleClient) AddFileToSection(courseID int64, sectionNum int64, itemID
 
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return 0, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return 0, fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return 0, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return 0, fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return 0, fmt.Errorf("moodle API Fehler beim Hinzufügen der Datei: %s", string(body))
+		return 0, fmt.Errorf("moodle API error adding file: %s", string(body))
 	}
 
 	var result struct {
@@ -119,12 +119,12 @@ func (c *MoodleClient) AddFileToSection(courseID int64, sectionNum int64, itemID
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return -1, fmt.Errorf("fehler beim Parsen der Kursinhalte: %w\nBody: %s", err, string(body))
+		return -1, fmt.Errorf("error parsing course contents: %w\nBody: %s", err, string(body))
 	}
 
 	id, err := strconv.ParseInt(result.Id, 10, 64)
 	if err != nil {
-		return -1, fmt.Errorf("konnte ID nicht als int64 parsen: %w", err)
+		return -1, fmt.Errorf("could not parse ID as int64: %w", err)
 	}
 
 	return id, nil

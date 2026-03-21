@@ -33,34 +33,34 @@ func (c *MoodleClient) CreateSection(courseID int64) (*Section, error) {
 
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return nil, fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler beim Hinzufügen der Sektion: %s", string(body))
+		return nil, fmt.Errorf("moodle API error adding section: %s", string(body))
 	}
 
-	// Die Moodle-API liefert die Antwort doppelt kodiert: ein JSON-String, der selbst ein JSON-Array enthält.
-	// Erster Schritt: den äußeren String entpacken.
+	// The Moodle API returns the response double encoded: a JSON string that itself contains a JSON array.
+	// First step: unpack the outer string.
 	var rawJSON string
 	if err := json.Unmarshal(body, &rawJSON); err != nil {
-		// Fallback: vielleicht ist es doch direkt ein Array
+		// Fallback: maybe it's directly an array
 		rawJSON = string(body)
 	}
 
-	// Zweiter Schritt: das eigentliche Array parsen.
+	// Second step: parse the actual array.
 	var updates []struct {
 		Name   string `json:"name"`
 		Action string `json:"action"`
@@ -72,7 +72,7 @@ func (c *MoodleClient) CreateSection(courseID int64) (*Section, error) {
 		} `json:"fields"`
 	}
 	if err := json.Unmarshal([]byte(rawJSON), &updates); err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen der API-Antwort: %w\nBody: %s", err, string(body))
+		return nil, fmt.Errorf("error parsing API response: %w\nBody: %s", err, string(body))
 	}
 
 	var newest *Section
@@ -100,13 +100,13 @@ func (c *MoodleClient) CreateSection(courseID int64) (*Section, error) {
 	}
 
 	if newest == nil {
-		return nil, fmt.Errorf("keine neue Sektion in der API-Antwort des Kurses %d gefunden", courseID)
+		return nil, fmt.Errorf("no new section found in API response for course %d", courseID)
 	}
 
 	return newest, nil
 }
 
-// GetCourseSections gibt alle Sektionen eines Kurses zurück (core_course_get_contents).
+// GetCourseSections GetCourseSections returns all sections of a course (core_course_get_contents).
 func (c *MoodleClient) GetCourseSections(courseID int64) ([]Section, error) {
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
@@ -118,33 +118,33 @@ func (c *MoodleClient) GetCourseSections(courseID int64) ([]Section, error) {
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return nil, fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler beim Lesen der Sektionen: %s", string(body))
+		return nil, fmt.Errorf("moodle API error reading sections: %s", string(body))
 	}
 
 	var sections []Section
 	if err := json.Unmarshal(body, &sections); err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen der Sektionen: %w\nBody: %s", err, string(body))
+		return nil, fmt.Errorf("error parsing sections: %w\nBody: %s", err, string(body))
 	}
 
 	return sections, nil
 }
 
-// GetSection gibt eine bestimmte Sektion anhand ihrer Datenbank-ID zurück.
+// GetSection returns a specific section by its database ID.
 func (c *MoodleClient) GetSection(courseID int64, sectionID int64) (*Section, error) {
 	sections, err := c.GetCourseSections(courseID)
 	if err != nil {
@@ -157,11 +157,11 @@ func (c *MoodleClient) GetSection(courseID int64, sectionID int64) (*Section, er
 		}
 	}
 
-	return nil, fmt.Errorf("sektion mit ID %d wurde im Kurs %d nicht gefunden", sectionID, courseID)
+	return nil, fmt.Errorf("section with ID %d not found in course %d", sectionID, courseID)
 }
 
-// EditSection aktualisiert Name, Zusammenfassung und Sichtbarkeit einer Sektion
-// über die Moodle-Funktion core_course_edit_section.
+// EditSection updates name, summary and visibility of a section
+// via the Moodle function core_course_edit_section.
 func (c *MoodleClient) EditSection(sectionID int64, name string, summary string, visible int64) error {
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
@@ -176,23 +176,23 @@ func (c *MoodleClient) EditSection(sectionID int64, name string, summary string,
 
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
 	if err != nil {
-		return fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("fehler beim Senden des Requests: %w", err)
+		return fmt.Errorf("error sending request: %w", err)
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
+		return fmt.Errorf("error reading API response: %w", err)
 	}
 
 	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API Fehler beim Bearbeiten der Sektion: %s", string(body))
+		return fmt.Errorf("moodle API error editing section: %s", string(body))
 	}
 
 	return nil

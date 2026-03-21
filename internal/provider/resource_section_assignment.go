@@ -51,8 +51,8 @@ func (r *sectionAssignmentResource) Configure(_ context.Context, req resource.Co
 	client, ok := req.ProviderData.(*moodle.MoodleClient)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unerwarteter Provider-Typ",
-			fmt.Sprintf("Erwartete *MoodleClient, bekam: %T. Bitte melde diesen Fehler.", req.ProviderData),
+			"Unexpected provider type",
+			fmt.Sprintf("Expected *MoodleClient, got: %T. Please report this error.", req.ProviderData),
 		)
 		return
 	}
@@ -62,32 +62,32 @@ func (r *sectionAssignmentResource) Configure(_ context.Context, req resource.Co
 
 func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Erstellt eine Assignment-Aktivität (Aufgabe) in einem Moodle-Kursabschnitt.",
+		Description: "Creates an assignment activity in a Moodle course section.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Die Course Module ID (cmID) der erstellten Aufgabe.",
+				Description: "The Course Module ID (cmID) of the created assignment.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"course_id": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die ID des Kurses, zu dem die Aufgabe hinzugefügt wird.",
+				Description: "The ID of the course to which the assignment is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"section_num": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die Sektionsnummer (0-basiert), zu der die Aufgabe hinzugefügt wird.",
+				Description: "The section number (0-based) to which the assignment is added.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "Der Anzeigename der Aufgabe.",
+				Description: "The display name of the assignment.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -95,7 +95,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"intro": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Aufgabenbeschreibung (HTML wird unterstützt).",
+				Description: "Assignment description (HTML is supported).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -103,7 +103,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"duedate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Abgabefrist im Format YYYY-MM-DD (z.B. 2026-06-30). Leer bedeutet keine Frist.",
+				Description: "Due date in format YYYY-MM-DD (e.g. 2026-06-30). Empty means no due date.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -111,7 +111,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"allowsubmissionsfromdate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Startdatum für Abgaben im Format YYYY-MM-DD. Leer bedeutet sofort.",
+				Description: "Start date for submissions in format YYYY-MM-DD. Empty means immediately.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -119,7 +119,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"maxbytes": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Maximale Dateigröße in Bytes. 0 bedeutet unbegrenzt.",
+				Description: "Maximum file size in bytes. 0 means unlimited.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
@@ -127,7 +127,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"maxfilesubmissions": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Maximale Anzahl hochladbarer Dateien pro Abgabe. Standard: 1.",
+				Description: "Maximum number of file submissions. Default: 1.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
@@ -135,7 +135,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"submissiontypes": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Abgabetypen als kommagetrennte Liste. Mögliche Werte: onlinetext, file. Standard: onlinetext.",
+				Description: "Submission types as comma-separated list. Possible values: onlinetext, file. Default: onlinetext.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -152,7 +152,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	// Defaults für optionale Felder
+	// Defaults for optional fields
 	intro := plan.Intro.ValueString()
 	maxBytes := plan.MaxBytes.ValueInt64()
 	maxFiles := plan.MaxFileSubmissions.ValueInt64()
@@ -166,12 +166,12 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 
 	dueDate, err := parseDateToUnix(plan.DueDate.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Ungültiges Abgabedatum", err.Error())
+		resp.Diagnostics.AddError("Invalid due date", err.Error())
 		return
 	}
 	allowFrom, err := parseDateToUnix(plan.AllowSubmissionsFromDate.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Ungültiges Startdatum für Abgaben", err.Error())
+		resp.Diagnostics.AddError("Invalid start date for submissions", err.Error())
 		return
 	}
 
@@ -187,7 +187,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 		submissionTypes,
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Erstellen der Aufgabe", err.Error())
+		resp.Diagnostics.AddError("Error creating assignment", err.Error())
 		return
 	}
 

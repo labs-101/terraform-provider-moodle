@@ -46,8 +46,8 @@ func (r *courseSectionResource) Configure(_ context.Context, req resource.Config
 	client, ok := req.ProviderData.(*moodle.MoodleClient)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unerwarteter Provider-Typ",
-			fmt.Sprintf("Erwartete *MoodleClient, bekam: %T. Bitte melde diesen Fehler.", req.ProviderData),
+			"Unexpected provider type",
+			fmt.Sprintf("Expected *MoodleClient, got: %T. Please report this error.", req.ProviderData),
 		)
 		return
 	}
@@ -57,34 +57,34 @@ func (r *courseSectionResource) Configure(_ context.Context, req resource.Config
 
 func (r *courseSectionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Verwaltet eine Sektion (Abschnitt) in einem Moodle-Kurs.",
+		Description: "Manages a section in a Moodle course.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Die interne Datenbank-ID der Moodle-Sektion.",
+				Description: "The internal database ID of the Moodle section.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"course_id": schema.Int64Attribute{
 				Required:    true,
-				Description: "Die ID des Kurses, zu dem diese Sektion gehört.",
+				Description: "The ID of the course to which this section belongs.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"name": schema.StringAttribute{
 				Required:    true,
-				Description: "Der Anzeigename der Sektion.",
+				Description: "The display name of the section.",
 			},
 			"summary": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Die Zusammenfassung/Beschreibung der Sektion (HTML wird unterstützt).",
+				Description: "The summary/description of the section (HTML is supported).",
 			},
 			"section": schema.Int64Attribute{
 				Computed:    true,
-				Description: "Die Sektionsnummer (Position) innerhalb des Kurses, wird von Moodle vergeben.",
+				Description: "The section number (position) within the course, assigned by Moodle.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -92,7 +92,7 @@ func (r *courseSectionResource) Schema(_ context.Context, _ resource.SchemaReque
 			"visible": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Sichtbarkeit der Sektion (1 = sichtbar, 0 = verborgen). Standard: 1.",
+				Description: "Visibility of the section (1 = visible, 0 = hidden). Default: 1.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -109,14 +109,14 @@ func (r *courseSectionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	// 1. Neue Sektion zum Kurs hinzufügen (Moodle hängt sie ans Ende)
+	// 1. Add new section to course (Moodle appends it to the end)
 	section, err := r.client.CreateSection(plan.CourseID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Erstellen der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error creating section", err.Error())
 		return
 	}
 
-	// 2. Name und Zusammenfassung setzen
+	// 2. Set name and summary
 	summary := plan.Summary.ValueString()
 	visible := plan.Visible.ValueInt64()
 	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
@@ -125,7 +125,7 @@ func (r *courseSectionResource) Create(ctx context.Context, req resource.CreateR
 
 	err = r.client.EditSection(section.ID, plan.Name.ValueString(), summary, visible)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Bearbeiten der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error editing section", err.Error())
 		return
 	}
 
@@ -149,7 +149,7 @@ func (r *courseSectionResource) Read(ctx context.Context, req resource.ReadReque
 
 	section, err := r.client.GetSection(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Lesen der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error reading section", err.Error())
 		return
 	}
 
@@ -176,7 +176,7 @@ func (r *courseSectionResource) Update(ctx context.Context, req resource.UpdateR
 
 	err := r.client.EditSection(plan.ID.ValueInt64(), plan.Name.ValueString(), plan.Summary.ValueString(), visible)
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Aktualisieren der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error updating section", err.Error())
 		return
 	}
 
@@ -193,7 +193,7 @@ func (r *courseSectionResource) Delete(ctx context.Context, req resource.DeleteR
 
 	err := r.client.DeleteSection(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Löschen der Sektion", err.Error())
+		resp.Diagnostics.AddError("Error deleting section", err.Error())
 		return
 	}
 }
