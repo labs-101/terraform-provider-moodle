@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"os"
+	"testing"
+
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
@@ -13,7 +16,6 @@ const (
 	providerConfig = `
 provider "moodle" {
   host           = "https://moodle.project101.tech"
-  token          = "84306731350159a02855e8dd6dfc1acc"
   moodle_version = "4.0"
 }
 `
@@ -28,3 +30,9 @@ var (
 		"moodle": providerserver.NewProtocol6WithError(New("test")()),
 	}
 )
+
+func testAccPreCheck(t *testing.T) {
+	if os.Getenv("MOODLE_TOKEN") == "" {
+		t.Fatal("MOODLE_TOKEN is missing")
+	}
+}
