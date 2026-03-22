@@ -161,7 +161,7 @@ func (p *MoodleProvider) EphemeralResources(ctx context.Context) []func() epheme
 
 func (p *MoodleProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		GetAllCoursesDataSource,
+		NewEnrolledUserDataSource,
 	}
 }
 
