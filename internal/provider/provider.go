@@ -46,7 +46,7 @@ func (p *MoodleProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				Required: true,
 			},
 			"token": schema.StringAttribute{
-				Optional:  true,
+				Required:  true,
 				Sensitive: true,
 			},
 			"moodle_version": schema.StringAttribute{
@@ -117,9 +117,9 @@ func (p *MoodleProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if token == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("token"),
-			"Missing Moodle API Token",
-			"The provider cannot create the Moodle API client as there is a missing or empty value for the Moodle API token. "+
-				"Set the token value in the configuration or use the MOODLE_TOKEN environment variable. "+
+			"Missing Moodle API Username",
+			"The provider cannot create the Moodle API client as there is a missing or empty value for the Moodle API username. "+
+				"Set the username value in the configuration or use the HASHICUPS_USERNAME environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
@@ -150,6 +150,8 @@ func (p *MoodleProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewSectionFileResource,
 		NewSectionChoiceResource,
 		NewSectionAssignmentResource,
+		NewQuizResource,
+		NewQuizQuestionResource,
 		NewUserResource,
 		NewUserEnrolmentResource,
 	}

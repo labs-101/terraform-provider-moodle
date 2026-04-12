@@ -96,7 +96,7 @@ func (d *enrolledUserDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	userStates := make([]userEnrolmentDatasourceModel, len(users))
+	var userStates []userEnrolmentDatasourceModel
 	for _, apiUser := range users {
 		roleIds := make([]types.Int64, len(users))
 
@@ -118,7 +118,10 @@ func (d *enrolledUserDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 }
 
+// Configure adds the provider configured client to the data source.
 func (d *enrolledUserDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	// Add a nil check when handling ProviderData because Terraform
+	// sets that data after it calls the ConfigureProvider RPC.
 	if req.ProviderData == nil {
 		return
 	}
