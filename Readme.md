@@ -8,9 +8,9 @@ A Terraform provider for managing Moodle resources such as courses, sections, qu
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
 - [Go](https://golang.org/doc/install) >= 1.21 (for building from source)
-- A running Moodle instance with the **[Moodle Course API](../moodle-course-api/README.md)** plugin installed
+- A running Moodle instance with the **[Moodle Course API](https://github.com/labs-101/moodle-course-api)** plugin installed
 
-> **Note:** This provider depends on the [Moodle Course API](../moodle-course-api/README.md) plugin. The plugin must be installed and enabled on your Moodle instance before using this provider, as it exposes the REST endpoints required by the provider.
+> **Note:** This provider depends on the [Moodle Course API](https://github.com/labs-101/moodle-course-api) plugin. The plugin must be installed and enabled on your Moodle instance before using this provider, as it exposes the REST endpoints required by the provider.
 
 ## Provider Configuration
 
