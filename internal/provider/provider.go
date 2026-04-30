@@ -154,6 +154,9 @@ func (p *MoodleProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewQuizQuestionResource,
 		NewUserResource,
 		NewUserEnrolmentResource,
+		NewGroupResource,
+		NewGroupMemberResource,
+		NewChoicegroupResource,
 	}
 }
 

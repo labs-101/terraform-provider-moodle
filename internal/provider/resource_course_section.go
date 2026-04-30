@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -81,6 +82,9 @@ func (r *courseSectionResource) Schema(_ context.Context, _ resource.SchemaReque
 				Optional:    true,
 				Computed:    true,
 				Description: "The summary/description of the section (HTML is supported).",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"section": schema.Int64Attribute{
 				Computed:    true,
@@ -174,7 +178,13 @@ func (r *courseSectionResource) Update(ctx context.Context, req resource.UpdateR
 		visible = 1
 	}
 
-	err := r.client.EditSection(plan.ID.ValueInt64(), plan.Name.ValueString(), plan.Summary.ValueString(), visible)
+	summary := plan.Summary.ValueString()
+	if plan.Summary.IsNull() || plan.Summary.IsUnknown() {
+		plan.Summary = types.StringValue("")
+		summary = ""
+	}
+
+	err := r.client.EditSection(plan.ID.ValueInt64(), plan.Name.ValueString(), summary, visible)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating section", err.Error())
 		return

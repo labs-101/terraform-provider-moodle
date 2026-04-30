@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -84,15 +85,27 @@ func (r *courseResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"idnumber": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "The ID number of the course.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"summary": schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "The summary/description of the course.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"visibility": schema.Int64Attribute{
 				Optional:    true,
+				Computed:    true,
 				Description: "The visibility of the course (1 = visible, 0 = hidden).",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"startdate": schema.StringAttribute{
 				Optional:    true,
@@ -162,6 +175,18 @@ func (r *courseResource) Create(ctx context.Context, req resource.CreateRequest,
 	})
 
 	plan.ID = types.Int64Value(course.Id)
+	// Resolve computed-optional fields to known values so Terraform does not
+	// see "unknown" in state after apply.
+	if plan.Visibility.IsNull() || plan.Visibility.IsUnknown() {
+		plan.Visibility = types.Int64Value(1) // Moodle default
+	}
+	if plan.Idnumber.IsNull() || plan.Idnumber.IsUnknown() {
+		plan.Idnumber = types.StringValue("")
+	}
+	if plan.Summary.IsNull() || plan.Summary.IsUnknown() {
+		plan.Summary = types.StringValue("")
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

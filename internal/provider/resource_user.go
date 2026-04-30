@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-moodle-provider/internal/moodle"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -188,7 +189,14 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	err := r.client.DeleteUser(state.ID.ValueInt64())
 	if err != nil {
+		// If the webservice does not have core_user_delete_users, treat as a warning
+		// and remove the resource from state so Terraform does not get stuck.
+		if strings.Contains(err.Error(), "accessexception") {
+			tflog.Warn(ctx, "User deletion skipped: core_user_delete_users not permitted on this webservice token. "+
+				"The user will remain in Moodle but has been removed from Terraform state.",
+				map[string]interface{}{"user_id": state.ID.ValueInt64()})
+			return
+		}
 		resp.Diagnostics.AddError("Error deleting user", err.Error())
-		return
 	}
 }
