@@ -94,7 +94,7 @@ type sectionFileResource struct {
 type sectionFileResourceModel struct {
 	ID          types.Int64  `tfsdk:"id"`
 	CourseID    types.Int64  `tfsdk:"course_id"`
-	SectionNum  types.Int64  `tfsdk:"section_num"`
+	Section  types.Int64  `tfsdk:"section"`
 	FilePath    types.String `tfsdk:"file_path"`
 	DisplayName types.String `tfsdk:"display_name"`
 	Visible     types.Int64  `tfsdk:"visible"`
@@ -140,7 +140,7 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"section_num": schema.Int64Attribute{
+			"section": schema.Int64Attribute{
 				Required:    true,
 				Description: "The section number (position in the course) to which the file is added.",
 				PlanModifiers: []planmodifier.Int64{
@@ -217,7 +217,7 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 	// 2. Link file to section
 	cmID, err := r.client.AddFileToSection(
 		plan.CourseID.ValueInt64(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		itemID,
 		displayName,
 		visible,

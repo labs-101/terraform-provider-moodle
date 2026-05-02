@@ -15,7 +15,7 @@ Creates an assignment activity in a Moodle course section.
 ```terraform
 resource "moodle_section_assignment" "project_submission" {
   course_id                 = moodle_course.example.id
-  section_num               = 2
+  section               = 2
   name                      = "Project Submission"
   intro                     = "<p>Submit your final project here.</p>"
   duedate                   = "2026-07-31"
@@ -33,7 +33,7 @@ resource "moodle_section_assignment" "project_submission" {
 
 - `course_id` (Number) The ID of the course to which the assignment is added.
 - `name` (String) The display name of the assignment.
-- `section_num` (Number) The section number (0-based) to which the assignment is added.
+- `section` (Number) The section number (0-based) to which the assignment is added.
 
 ### Optional
 

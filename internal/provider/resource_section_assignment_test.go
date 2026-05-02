@@ -14,7 +14,7 @@ func TestAccSectionAssignmentResource(t *testing.T) {
 				Config: testAccSectionAssignmentConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_section_assignment.test", "name", "Project Submission"),
-					resource.TestCheckResourceAttr("moodle_section_assignment.test", "section_num", "0"),
+					resource.TestCheckResourceAttr("moodle_section_assignment.test", "section", "0"),
 					resource.TestCheckResourceAttr("moodle_section_assignment.test", "duedate", "2026-12-31"),
 					resource.TestCheckResourceAttr("moodle_section_assignment.test", "maxbytes", "10485760"),
 					resource.TestCheckResourceAttr("moodle_section_assignment.test", "submissiontypes", "file"),
@@ -36,7 +36,7 @@ resource "moodle_course" "assn_course" {
 
 resource "moodle_section_assignment" "test" {
   course_id       = moodle_course.assn_course.id
-  section_num     = 0
+  section     = 0
   name            = "Project Submission"
   intro           = "<p>Submit your project here.</p>"
   duedate         = "2026-12-31"

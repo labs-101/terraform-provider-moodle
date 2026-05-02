@@ -30,7 +30,7 @@ type sectionChoiceResource struct {
 type sectionChoiceResourceModel struct {
 	ID            types.Int64  `tfsdk:"id"`
 	CourseID      types.Int64  `tfsdk:"course_id"`
-	SectionNum    types.Int64  `tfsdk:"section_num"`
+	Section    types.Int64  `tfsdk:"section"`
 	Name          types.String `tfsdk:"name"`
 	Intro         types.String `tfsdk:"intro"`
 	Options       types.List   `tfsdk:"options"`
@@ -76,7 +76,7 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"section_num": schema.Int64Attribute{
+			"section": schema.Int64Attribute{
 				Required:    true,
 				Description: "The section number (0-based) to which the Choice is added.",
 				PlanModifiers: []planmodifier.Int64{
@@ -138,7 +138,7 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 
 	cmID, err := r.client.AddChoiceToSection(
 		plan.CourseID.ValueInt64(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
 		intro,
 		options,

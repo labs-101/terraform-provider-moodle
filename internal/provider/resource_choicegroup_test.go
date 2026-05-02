@@ -15,7 +15,7 @@ func TestAccChoicegroupResource(t *testing.T) {
 				Config: testAccChoicegroupConfig("Pick Your Team"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_choicegroup.test", "name", "Pick Your Team"),
-					resource.TestCheckResourceAttr("moodle_choicegroup.test", "section_num", "0"),
+					resource.TestCheckResourceAttr("moodle_choicegroup.test", "section", "0"),
 					resource.TestCheckResourceAttr("moodle_choicegroup.test", "visible", "1"),
 					resource.TestCheckResourceAttr("moodle_choicegroup.test", "multipleenrollmentspossible", "0"),
 					resource.TestCheckResourceAttr("moodle_choicegroup.test", "showresults", "0"),
@@ -62,7 +62,7 @@ resource "moodle_group" "cg_group_b" {
 
 resource "moodle_choicegroup" "test" {
   course_id                   = moodle_course.cg_course.id
-  section_num                 = 0
+  section                 = 0
   name                        = %[1]q
   intro                       = "<p>Choose your group.</p>"
   group_ids                   = [moodle_group.cg_group_a.id, moodle_group.cg_group_b.id]

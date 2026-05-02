@@ -15,7 +15,7 @@ Creates a Choice activity in a Moodle course section.
 ```terraform
 resource "moodle_section_choice" "favourite_language" {
   course_id      = moodle_course.example.id
-  section_num    = 1
+  section    = 1
   name           = "What is your favourite programming language?"
   intro          = "<p>Please select one option.</p>"
   options        = ["Go", "Python", "Java", "TypeScript"]
@@ -31,7 +31,7 @@ resource "moodle_section_choice" "favourite_language" {
 - `course_id` (Number) The ID of the course to which the Choice is added.
 - `name` (String) The display name of the Choice activity.
 - `options` (List of String) List of options (at least 2).
-- `section_num` (Number) The section number (0-based) to which the Choice is added.
+- `section` (Number) The section number (0-based) to which the Choice is added.
 
 ### Optional
 

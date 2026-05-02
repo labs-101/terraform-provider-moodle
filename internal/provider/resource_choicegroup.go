@@ -28,7 +28,7 @@ type choicegroupResource struct {
 type choicegroupResourceModel struct {
 	ID                  types.Int64  `tfsdk:"id"`
 	CourseID            types.Int64  `tfsdk:"course_id"`
-	SectionNum          types.Int64  `tfsdk:"section_num"`
+	Section             types.Int64  `tfsdk:"section"`
 	Name                types.String `tfsdk:"name"`
 	Intro               types.String `tfsdk:"intro"`
 	GroupIDs            types.List   `tfsdk:"group_ids"`
@@ -80,7 +80,7 @@ func (r *choicegroupResource) Schema(_ context.Context, _ resource.SchemaRequest
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"section_num": schema.Int64Attribute{
+			"section": schema.Int64Attribute{
 				Required:    true,
 				Description: "The section number (0-based) to place the activity in. Can be changed via update.",
 			},
@@ -169,7 +169,7 @@ func (r *choicegroupResource) Create(ctx context.Context, req resource.CreateReq
 
 	cmID, err := r.client.CreateChoicegroup(
 		plan.CourseID.ValueInt64(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
 		plan.Intro.ValueString(),
 		groupIDs,
@@ -259,8 +259,8 @@ func (r *choicegroupResource) Update(ctx context.Context, req resource.UpdateReq
 		visible = 1
 	}
 
-	// Pass section_num as section to allow repositioning.
-	section := plan.SectionNum.ValueInt64()
+	// Pass section to allow repositioning.
+	section := plan.Section.ValueInt64()
 
 	err = r.client.UpdateChoicegroup(
 		state.CourseID.ValueInt64(),

@@ -28,7 +28,7 @@ type sectionLabelResource struct {
 type sectionLabelResourceModel struct {
 	ID                types.Int64  `tfsdk:"id"`
 	CourseID          types.Int64  `tfsdk:"course_id"`
-	SectionNum        types.Int64  `tfsdk:"section_num"`
+	Section        types.Int64  `tfsdk:"section"`
 	Intro             types.String `tfsdk:"intro"`
 	Name              types.String `tfsdk:"name"`
 	PreviousElementId types.Int64  `tfsdk:"previous_element_id"`
@@ -74,7 +74,7 @@ func (r *sectionLabelResource) Schema(_ context.Context, _ resource.SchemaReques
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"section_num": schema.Int64Attribute{
+			"section": schema.Int64Attribute{
 				Required:    true,
 				Description: "The section number (0-based) in which the Label is placed.",
 			},
@@ -117,7 +117,7 @@ func (r *sectionLabelResource) Create(ctx context.Context, req resource.CreateRe
 
 	cmID, err := r.client.CreateLabel(
 		plan.CourseID.ValueInt64(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		plan.Intro.ValueString(),
 		name,
 		previousElementId,
@@ -189,7 +189,7 @@ func (r *sectionLabelResource) Update(ctx context.Context, req resource.UpdateRe
 		state.ID.ValueInt64(),
 		plan.Intro.ValueString(),
 		plan.Name.ValueString(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		previousElementId,
 		visible,
 	)

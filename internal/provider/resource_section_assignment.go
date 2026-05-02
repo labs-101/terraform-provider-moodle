@@ -29,7 +29,7 @@ type sectionAssignmentResource struct {
 type sectionAssignmentResourceModel struct {
 	ID                       types.Int64  `tfsdk:"id"`
 	CourseID                 types.Int64  `tfsdk:"course_id"`
-	SectionNum               types.Int64  `tfsdk:"section_num"`
+	Section               types.Int64  `tfsdk:"section"`
 	Name                     types.String `tfsdk:"name"`
 	Intro                    types.String `tfsdk:"intro"`
 	DueDate                  types.String `tfsdk:"duedate"`
@@ -78,7 +78,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 					int64planmodifier.RequiresReplace(),
 				},
 			},
-			"section_num": schema.Int64Attribute{
+			"section": schema.Int64Attribute{
 				Required:    true,
 				Description: "The section number (0-based) to which the assignment is added.",
 				PlanModifiers: []planmodifier.Int64{
@@ -177,7 +177,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 
 	cmID, err := r.client.AddAssignmentToSection(
 		plan.CourseID.ValueInt64(),
-		plan.SectionNum.ValueInt64(),
+		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
 		intro,
 		dueDate,

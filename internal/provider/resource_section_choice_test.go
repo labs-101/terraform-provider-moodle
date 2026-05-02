@@ -14,7 +14,7 @@ func TestAccSectionChoiceResource(t *testing.T) {
 				Config: testAccSectionChoiceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_section_choice.test", "name", "Preferred Meeting Time"),
-					resource.TestCheckResourceAttr("moodle_section_choice.test", "section_num", "0"),
+					resource.TestCheckResourceAttr("moodle_section_choice.test", "section", "0"),
 					resource.TestCheckResourceAttr("moodle_section_choice.test", "allow_multiple", "false"),
 					resource.TestCheckResourceAttr("moodle_section_choice.test", "options.#", "3"),
 					resource.TestCheckResourceAttrSet("moodle_section_choice.test", "id"),
@@ -35,7 +35,7 @@ resource "moodle_course" "choice_course" {
 
 resource "moodle_section_choice" "test" {
   course_id      = moodle_course.choice_course.id
-  section_num    = 0
+  section    = 0
   name           = "Preferred Meeting Time"
   intro          = "<p>When can you meet?</p>"
   options        = ["Monday 10:00", "Tuesday 14:00", "Wednesday 16:00"]

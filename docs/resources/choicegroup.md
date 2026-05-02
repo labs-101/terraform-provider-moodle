@@ -15,7 +15,7 @@ Creates a Group Choice (choicegroup) activity in a Moodle course section.
 ```terraform
 resource "moodle_choicegroup" "pick_your_team" {
   course_id                   = moodle_course.example.id
-  section_num                 = 1
+  section                 = 1
   name                        = "Pick Your Project Team"
   intro                       = "<p>Please select the group you want to join.</p>"
   group_ids                   = [moodle_group.team_alpha.id, moodle_group.team_beta.id]
@@ -37,7 +37,7 @@ resource "moodle_choicegroup" "pick_your_team" {
 - `course_id` (Number) The ID of the course.
 - `group_ids` (List of Number) List of group IDs that participants can choose from (at least 1).
 - `name` (String) The display name of the Group Choice activity.
-- `section_num` (Number) The section number (0-based) to place the activity in. Can be changed via update.
+- `section` (Number) The section number (0-based) to place the activity in. Can be changed via update.
 
 ### Optional
 

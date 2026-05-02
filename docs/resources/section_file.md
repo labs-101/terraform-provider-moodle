@@ -15,7 +15,7 @@ Uploads a local file to Moodle and links it as a resource to a course section.
 ```terraform
 resource "moodle_section_file" "syllabus" {
   course_id    = moodle_course.example.id
-  section_num  = 0
+  section  = 0
   file_path    = "/path/to/syllabus.pdf"
   display_name = "Course Syllabus"
   visible      = 1
@@ -29,7 +29,7 @@ resource "moodle_section_file" "syllabus" {
 
 - `course_id` (Number) The ID of the course to which the file is added.
 - `file_path` (String) Relative or absolute path to the file to be uploaded. Relative paths are resolved relative to the working directory.
-- `section_num` (Number) The section number (position in the course) to which the file is added.
+- `section` (Number) The section number (position in the course) to which the file is added.
 
 ### Optional
 

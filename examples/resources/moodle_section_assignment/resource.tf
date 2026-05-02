@@ -1,6 +1,6 @@
 resource "moodle_section_assignment" "project_submission" {
   course_id                 = moodle_course.example.id
-  section_num               = 2
+  section               = 2
   name                      = "Project Submission"
   intro                     = "<p>Submit your final project here.</p>"
   duedate                   = "2026-07-31"
