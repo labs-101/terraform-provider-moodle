@@ -9,16 +9,10 @@ import (
 )
 
 // providerConfig is built from MOODLE_HOST / MOODLE_TOKEN environment variables.
-// Falls back to the local development defaults when the variables are not set.
 var providerConfig = func() string {
 	host := os.Getenv("MOODLE_HOST")
-	if host == "" {
-		host = "http://localhost:8080"
-	}
 	token := os.Getenv("MOODLE_TOKEN")
-	if token == "" {
-		token = "84306731350159a02855e8dd6dfc1acc"
-	}
+
 	return fmt.Sprintf(`
 provider "moodle" {
   host  = %q
