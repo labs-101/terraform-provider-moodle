@@ -34,7 +34,7 @@ resource "moodle_section_file" "syllabus" {
 ### Optional
 
 - `display_name` (String) Display name of the file in Moodle. If not specified, the filename is used.
-- `file_hash` (String) MD5 hash of the file (e.g. filemd5("path/to/file")). Changes force a re-upload.
+- `file_hash` (String) MD5 hash of the file. If omitted, computed automatically from file_path. Changes force a re-upload.
 - `visible` (Number) Visibility of the file (1 = visible, 0 = hidden). Default: 1.
 
 ### Read-Only
