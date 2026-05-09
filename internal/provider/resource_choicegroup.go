@@ -223,7 +223,6 @@ func (r *choicegroupResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// No dedicated read endpoint in the custom API — keep existing state.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

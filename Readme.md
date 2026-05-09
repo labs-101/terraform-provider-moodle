@@ -39,16 +39,20 @@ The `token` and `host` values can also be set via the environment variables `MOO
 | `moodle_section_assignment`     | Add assignments to a course section      |
 | `moodle_section_choice`         | Add choice activities to a section       |
 | `moodle_section_file`           | Upload files to a section                |
+| `moodle_section_label`          | Add labels to a course section           |
 | `moodle_quiz`                   | Manage quizzes                           |
 | `moodle_quiz_question`          | Manage quiz questions                    |
+| `moodle_choicegroup`            | Manage choice groups                     |
+| `moodle_group`                  | Manage groups within a course            |
+| `moodle_group_member`           | Manage group memberships                 |
 | `moodle_user`                   | Manage Moodle users                      |
 | `moodle_user_enrolment`         | Enrol users into courses                 |
 
 ## Supported Data Sources
 
-| Data Source              | Description                              |
-|--------------------------|------------------------------------------|
-| `moodle_enrolled_users`  | Retrieve users enrolled in a course      |
+| Data Source             | Description                              |
+|-------------------------|------------------------------------------|
+| `moodle_enrolled_user`  | Retrieve users enrolled in a course      |
 
 ## Building from Source
 

@@ -13,11 +13,11 @@ Uploads a local file to Moodle and links it as a resource to a course section.
 ## Example Usage
 
 ```terraform
-resource "moodle_section_file" "syllabus" {
+resource "moodle_section_file" "file_pdf" {
   course_id    = moodle_course.example.id
-  section  = 0
-  file_path    = "/path/to/syllabus.pdf"
-  display_name = "Course Syllabus"
+  section      = moodle_course_section.file.section
+  file_path    = "/path/to/file.pdf"
+  display_name = "File.pdf"
   visible      = 1
 }
 ```
