@@ -37,7 +37,7 @@ resource "moodle_section_choice" "test" {
   course_id      = moodle_course.choice_course.id
   section    = 0
   name           = "Preferred Meeting Time"
-  intro          = "<p>When can you meet?</p>"
+  description          = "<p>When can you meet?</p>"
   options        = ["Monday 10:00", "Tuesday 14:00", "Wednesday 16:00"]
   allow_multiple = false
 }

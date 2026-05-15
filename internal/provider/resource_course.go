@@ -28,15 +28,15 @@ type courseResource struct {
 }
 
 type courseResourceModel struct {
-	ID         types.Int64  `tfsdk:"id"`
-	Fullname   types.String `tfsdk:"fullname"`
-	Shortname  types.String `tfsdk:"shortname"`
-	CategoryID types.Int64  `tfsdk:"categoryid"`
-	Idnumber   types.String `tfsdk:"idnumber"`
-	Summary    types.String `tfsdk:"summary"`
-	Visibility types.Int64  `tfsdk:"visibility"`
-	StartDate  types.String `tfsdk:"startdate"`
-	EndDate    types.String `tfsdk:"enddate"`
+	ID          types.Int64  `tfsdk:"id"`
+	Fullname    types.String `tfsdk:"fullname"`
+	Shortname   types.String `tfsdk:"shortname"`
+	CategoryID  types.Int64  `tfsdk:"categoryid"`
+	Idnumber    types.String `tfsdk:"idnumber"`
+	Description types.String `tfsdk:"description"`
+	Visibility  types.Int64  `tfsdk:"visibility"`
+	StartDate   types.String `tfsdk:"startdate"`
+	EndDate     types.String `tfsdk:"enddate"`
 }
 
 func (r *courseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -91,10 +91,10 @@ func (r *courseResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"summary": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "The summary/description of the course.",
+				Description: "The description of the course.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -154,13 +154,13 @@ func (r *courseResource) Create(ctx context.Context, req resource.CreateRequest,
 		"shortname":  plan.Shortname.ValueString(),
 		"categoryid": plan.CategoryID.ValueInt64(),
 		"idnumber":   plan.Idnumber.ValueString(),
-		"summary":    plan.Summary.ValueString(),
+		"summary":    plan.Description.ValueString(),
 		"visibility": plan.Visibility.ValueInt64(),
 		"startdate":  startdate,
 		"enddate":    enddate,
 	})
 
-	course, err := r.client.CreateCourse(plan.Fullname.ValueString(), plan.Shortname.ValueString(), plan.CategoryID.ValueInt64(), plan.Idnumber.ValueString(), plan.Summary.ValueString(), plan.Visibility.ValueInt64(), startdate, enddate)
+	course, err := r.client.CreateCourse(plan.Fullname.ValueString(), plan.Shortname.ValueString(), plan.CategoryID.ValueInt64(), plan.Idnumber.ValueString(), plan.Description.ValueString(), plan.Visibility.ValueInt64(), startdate, enddate)
 	if err != nil {
 		tflog.Error(ctx, "Error creating course", map[string]any{
 			"error": err.Error(),
@@ -175,16 +175,15 @@ func (r *courseResource) Create(ctx context.Context, req resource.CreateRequest,
 	})
 
 	plan.ID = types.Int64Value(course.Id)
-	// Resolve computed-optional fields to known values so Terraform does not
-	// see "unknown" in state after apply.
+
 	if plan.Visibility.IsNull() || plan.Visibility.IsUnknown() {
 		plan.Visibility = types.Int64Value(1) // Moodle default
 	}
 	if plan.Idnumber.IsNull() || plan.Idnumber.IsUnknown() {
 		plan.Idnumber = types.StringValue("")
 	}
-	if plan.Summary.IsNull() || plan.Summary.IsUnknown() {
-		plan.Summary = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -207,7 +206,7 @@ func (r *courseResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.Fullname = types.StringValue(course.Fullname)
 	state.Shortname = types.StringValue(course.Shortname)
 	state.Idnumber = types.StringValue(course.Idnumber)
-	state.Summary = types.StringValue(course.Summary)
+	state.Description = types.StringValue(course.Description)
 	state.Visibility = types.Int64Value(course.Visibility)
 
 	if startDateStr := unixToDate(course.StartDate); startDateStr == "" {
@@ -250,7 +249,7 @@ func (r *courseResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.Shortname.ValueString(),
 		plan.CategoryID.ValueInt64(),
 		plan.Idnumber.ValueString(),
-		plan.Summary.ValueString(),
+		plan.Description.ValueString(),
 		plan.Visibility.ValueInt64(),
 		startdate,
 		enddate,

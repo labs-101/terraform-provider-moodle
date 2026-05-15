@@ -10,14 +10,14 @@ import (
 )
 
 type Course struct {
-	Id         int64  `json:"id"`
-	Shortname  string `json:"shortname"`
-	Fullname   string `json:"fullname"`
-	Idnumber   string `json:"idnumber"`
-	Summary    string `json:"summary"`
-	Visibility int64  `json:"visible"`
-	StartDate  int64  `json:"startdate"`
-	EndDate    int64  `json:"enddate"`
+	Id          int64  `json:"id"`
+	Shortname   string `json:"shortname"`
+	Fullname    string `json:"fullname"`
+	Idnumber    string `json:"idnumber"`
+	Description string `json:"summary"`
+	Visibility  int64  `json:"visible"`
+	StartDate   int64  `json:"startdate"`
+	EndDate     int64  `json:"enddate"`
 }
 
 func (c *MoodleClient) GetAllCourses() ([]Course, error) {
@@ -84,7 +84,6 @@ func (c *MoodleClient) CreateCourse(fullname, shortname string, categoryID int64
 		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
 	}
 
-	// TODO create utils function for default moodle errors
 	if strings.Contains(string(body), "exception") {
 		return nil, fmt.Errorf("moodle API Fehler: %s", string(body))
 	}

@@ -18,7 +18,7 @@ Creates a Label (Textfeld) activity in a Moodle course section. Labels display H
 ### Required
 
 - `course_id` (Number) The ID of the course to which the Label is added.
-- `intro` (String) HTML content of the label that is displayed directly in the course section.
+- `description` (String) HTML content of the label that is displayed directly in the course section.
 - `section` (Number) The section number (0-based) in which the Label is placed.
 
 ### Optional

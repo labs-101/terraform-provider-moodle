@@ -29,7 +29,7 @@ type quizResourceModel struct {
 	ID               types.Int64  `tfsdk:"id"`
 	CourseID         types.Int64  `tfsdk:"course_id"`
 	Name             types.String `tfsdk:"name"`
-	Intro            types.String `tfsdk:"intro"`
+	Description      types.String `tfsdk:"description"`
 	Password         types.String `tfsdk:"password"`
 	TimeOpen         types.String `tfsdk:"timeopen"`
 	TimeClose        types.String `tfsdk:"timeclose"`
@@ -85,7 +85,7 @@ func (r *quizResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required:    true,
 				Description: "The display name of the quiz.",
 			},
-			"intro": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Quiz description (HTML is supported).",
@@ -153,7 +153,7 @@ func (r *quizResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	intro := plan.Intro.ValueString()
+	intro := plan.Description.ValueString()
 	password := plan.Password.ValueString()
 	navMethod := plan.NavMethod.ValueString()
 	if plan.NavMethod.IsNull() || plan.NavMethod.IsUnknown() || navMethod == "" {
@@ -208,8 +208,8 @@ func (r *quizResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	plan.ID = types.Int64Value(quizID)
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.Password.IsNull() || plan.Password.IsUnknown() {
 		plan.Password = types.StringValue("")
@@ -253,8 +253,6 @@ func (r *quizResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	// The quiz ID stored is the quiz instance ID, not cmID.
-	// We keep state as-is since the Moodle API does not provide a dedicated read endpoint for our custom plugin.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -272,7 +270,7 @@ func (r *quizResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	intro := plan.Intro.ValueString()
+	intro := plan.Description.ValueString()
 	password := plan.Password.ValueString()
 	navMethod := plan.NavMethod.ValueString()
 	if plan.NavMethod.IsNull() || plan.NavMethod.IsUnknown() || navMethod == "" {
@@ -327,8 +325,8 @@ func (r *quizResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	plan.ID = state.ID
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.Password.IsNull() || plan.Password.IsUnknown() {
 		plan.Password = types.StringValue("")

@@ -36,7 +36,7 @@ resource "moodle_section_choice" "favourite_language" {
 ### Optional
 
 - `allow_multiple` (Boolean) Whether multiple selection is allowed. Default: false.
-- `intro` (String) Description text of the Choice activity (HTML is supported).
+- `description` (String) Description text of the Choice activity (HTML is supported).
 
 ### Read-Only
 

@@ -38,7 +38,7 @@ resource "moodle_section_assignment" "test" {
   course_id       = moodle_course.assn_course.id
   section     = 0
   name            = "Project Submission"
-  intro           = "<p>Submit your project here.</p>"
+  description           = "<p>Submit your project here.</p>"
   duedate         = "2026-12-31"
   maxbytes        = 10485760
   submissiontypes = "file"

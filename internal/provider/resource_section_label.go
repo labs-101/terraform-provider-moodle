@@ -28,8 +28,8 @@ type sectionLabelResource struct {
 type sectionLabelResourceModel struct {
 	ID                types.Int64  `tfsdk:"id"`
 	CourseID          types.Int64  `tfsdk:"course_id"`
-	Section        types.Int64  `tfsdk:"section"`
-	Intro             types.String `tfsdk:"intro"`
+	Section           types.Int64  `tfsdk:"section"`
+	Description       types.String `tfsdk:"description"`
 	Name              types.String `tfsdk:"name"`
 	PreviousElementId types.Int64  `tfsdk:"previous_element_id"`
 	Visible           types.Int64  `tfsdk:"visible"`
@@ -78,7 +78,7 @@ func (r *sectionLabelResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:    true,
 				Description: "The section number (0-based) in which the Label is placed.",
 			},
-			"intro": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Required:    true,
 				Description: "HTML content of the label that is displayed directly in the course section.",
 			},
@@ -118,7 +118,7 @@ func (r *sectionLabelResource) Create(ctx context.Context, req resource.CreateRe
 	cmID, err := r.client.CreateLabel(
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
-		plan.Intro.ValueString(),
+		plan.Description.ValueString(),
 		name,
 		previousElementId,
 	)
@@ -187,7 +187,7 @@ func (r *sectionLabelResource) Update(ctx context.Context, req resource.UpdateRe
 	err := r.client.UpdateLabel(
 		state.CourseID.ValueInt64(),
 		state.ID.ValueInt64(),
-		plan.Intro.ValueString(),
+		plan.Description.ValueString(),
 		plan.Name.ValueString(),
 		plan.Section.ValueInt64(),
 		previousElementId,

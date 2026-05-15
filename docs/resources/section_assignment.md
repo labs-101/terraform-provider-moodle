@@ -34,8 +34,8 @@ resource "moodle_section_assignment" "project_submission" {
 ### Optional
 
 - `allowsubmissionsfromdate` (String) Start date for submissions in format YYYY-MM-DD. Empty means immediately.
+- `description` (String) Assignment description (HTML is supported).
 - `duedate` (String) Due date in format YYYY-MM-DD (e.g. 2026-06-30). Empty means no due date.
-- `intro` (String) Assignment description (HTML is supported).
 - `maxbytes` (Number) Maximum file size in bytes. 0 means unlimited.
 - `maxfilesubmissions` (Number) Maximum number of file submissions. Default: 1.
 - `submissiontypes` (String) Submission types as comma-separated list. Possible values: onlinetext, file. Default: onlinetext.

@@ -13,24 +13,24 @@ import (
 )
 
 var (
-	_ resource.Resource              = &choicegroupResource{}
-	_ resource.ResourceWithConfigure = &choicegroupResource{}
+	_ resource.Resource              = &groupChoiceResource{}
+	_ resource.ResourceWithConfigure = &groupChoiceResource{}
 )
 
-func NewChoicegroupResource() resource.Resource {
-	return &choicegroupResource{}
+func NewGroupChoiceResource() resource.Resource {
+	return &groupChoiceResource{}
 }
 
-type choicegroupResource struct {
+type groupChoiceResource struct {
 	client *moodle.MoodleClient
 }
 
-type choicegroupResourceModel struct {
+type groupChoiceResourceModel struct {
 	ID                  types.Int64  `tfsdk:"id"`
 	CourseID            types.Int64  `tfsdk:"course_id"`
 	Section             types.Int64  `tfsdk:"section"`
 	Name                types.String `tfsdk:"name"`
-	Intro               types.String `tfsdk:"intro"`
+	Description         types.String `tfsdk:"description"`
 	GroupIDs            types.List   `tfsdk:"group_ids"`
 	MultipleEnrollments types.Int64  `tfsdk:"multipleenrollmentspossible"`
 	ShowResults         types.Int64  `tfsdk:"showresults"`
@@ -41,11 +41,11 @@ type choicegroupResourceModel struct {
 	PreviousElementID   types.Int64  `tfsdk:"previous_element_id"`
 }
 
-func (r *choicegroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_choicegroup"
+func (r *groupChoiceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_group_choice"
 }
 
-func (r *choicegroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *groupChoiceResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -62,13 +62,13 @@ func (r *choicegroupResource) Configure(_ context.Context, req resource.Configur
 	r.client = client
 }
 
-func (r *choicegroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *groupChoiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Creates a Group Choice (choicegroup) activity in a Moodle course section.",
+		Description: "Creates a Group Choice (groupChoice) activity in a Moodle course section.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.Int64Attribute{
 				Computed:    true,
-				Description: "The Course Module ID (cmID) of the created choicegroup activity.",
+				Description: "The Course Module ID (cmID) of the created groupChoice activity.",
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
@@ -88,7 +88,7 @@ func (r *choicegroupResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Required:    true,
 				Description: "The display name of the Group Choice activity.",
 			},
-			"intro": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Description text (HTML supported).",
@@ -137,8 +137,8 @@ func (r *choicegroupResource) Schema(_ context.Context, _ resource.SchemaRequest
 	}
 }
 
-func (r *choicegroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan choicegroupResourceModel
+func (r *groupChoiceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan groupChoiceResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -171,7 +171,7 @@ func (r *choicegroupResource) Create(ctx context.Context, req resource.CreateReq
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
-		plan.Intro.ValueString(),
+		plan.Description.ValueString(),
 		groupIDs,
 		plan.MultipleEnrollments.ValueInt64(),
 		plan.ShowResults.ValueInt64(),
@@ -187,8 +187,8 @@ func (r *choicegroupResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	plan.ID = types.Int64Value(cmID)
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.MultipleEnrollments.IsNull() || plan.MultipleEnrollments.IsUnknown() {
 		plan.MultipleEnrollments = types.Int64Value(0)
@@ -215,8 +215,8 @@ func (r *choicegroupResource) Create(ctx context.Context, req resource.CreateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *choicegroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state choicegroupResourceModel
+func (r *groupChoiceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state groupChoiceResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -226,9 +226,9 @@ func (r *choicegroupResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *choicegroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan choicegroupResourceModel
-	var state choicegroupResourceModel
+func (r *groupChoiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan groupChoiceResourceModel
+	var state groupChoiceResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -265,7 +265,7 @@ func (r *choicegroupResource) Update(ctx context.Context, req resource.UpdateReq
 		state.CourseID.ValueInt64(),
 		state.ID.ValueInt64(),
 		plan.Name.ValueString(),
-		plan.Intro.ValueString(),
+		plan.Description.ValueString(),
 		groupIDs,
 		plan.MultipleEnrollments.ValueInt64(),
 		plan.ShowResults.ValueInt64(),
@@ -277,13 +277,13 @@ func (r *choicegroupResource) Update(ctx context.Context, req resource.UpdateReq
 		plan.PreviousElementID.ValueInt64(),
 	)
 	if err != nil {
-		resp.Diagnostics.AddError("Error updating choicegroup", err.Error())
+		resp.Diagnostics.AddError("Error updating groupChoice", err.Error())
 		return
 	}
 
 	plan.ID = state.ID
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.MultipleEnrollments.IsNull() || plan.MultipleEnrollments.IsUnknown() {
 		plan.MultipleEnrollments = types.Int64Value(0)
@@ -310,8 +310,8 @@ func (r *choicegroupResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *choicegroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state choicegroupResourceModel
+func (r *groupChoiceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var state groupChoiceResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -319,6 +319,6 @@ func (r *choicegroupResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	if err := r.client.DeleteModule(state.CourseID.ValueInt64(), state.ID.ValueInt64()); err != nil {
-		resp.Diagnostics.AddError("Error deleting choicegroup", err.Error())
+		resp.Diagnostics.AddError("Error deleting groupChoice", err.Error())
 	}
 }

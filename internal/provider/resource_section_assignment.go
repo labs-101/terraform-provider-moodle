@@ -29,9 +29,9 @@ type sectionAssignmentResource struct {
 type sectionAssignmentResourceModel struct {
 	ID                       types.Int64  `tfsdk:"id"`
 	CourseID                 types.Int64  `tfsdk:"course_id"`
-	Section               types.Int64  `tfsdk:"section"`
+	Section                  types.Int64  `tfsdk:"section"`
 	Name                     types.String `tfsdk:"name"`
-	Intro                    types.String `tfsdk:"intro"`
+	Description              types.String `tfsdk:"description"`
 	DueDate                  types.String `tfsdk:"duedate"`
 	AllowSubmissionsFromDate types.String `tfsdk:"allowsubmissionsfromdate"`
 	MaxBytes                 types.Int64  `tfsdk:"maxbytes"`
@@ -92,7 +92,7 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"intro": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Assignment description (HTML is supported).",
@@ -153,7 +153,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	// Defaults for optional fields
-	intro := plan.Intro.ValueString()
+	description := plan.Description.ValueString()
 	maxBytes := plan.MaxBytes.ValueInt64()
 	maxFiles := plan.MaxFileSubmissions.ValueInt64()
 	if plan.MaxFileSubmissions.IsNull() || plan.MaxFileSubmissions.IsUnknown() {
@@ -179,7 +179,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
-		intro,
+		description,
 		dueDate,
 		allowFrom,
 		maxBytes,
@@ -192,8 +192,8 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	plan.ID = types.Int64Value(cmID)
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.DueDate.IsNull() || plan.DueDate.IsUnknown() {
 		plan.DueDate = types.StringValue("")
@@ -238,7 +238,6 @@ func (r *sectionAssignmentResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *sectionAssignmentResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// Alle Attribute haben RequiresReplace — Update wird nie aufgerufen.
 	var plan sectionAssignmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {

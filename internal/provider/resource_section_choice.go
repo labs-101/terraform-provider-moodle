@@ -30,9 +30,9 @@ type sectionChoiceResource struct {
 type sectionChoiceResourceModel struct {
 	ID            types.Int64  `tfsdk:"id"`
 	CourseID      types.Int64  `tfsdk:"course_id"`
-	Section    types.Int64  `tfsdk:"section"`
+	Section       types.Int64  `tfsdk:"section"`
 	Name          types.String `tfsdk:"name"`
-	Intro         types.String `tfsdk:"intro"`
+	Description   types.String `tfsdk:"description"`
 	Options       types.List   `tfsdk:"options"`
 	AllowMultiple types.Bool   `tfsdk:"allow_multiple"`
 }
@@ -90,7 +90,7 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"intro": schema.StringAttribute{
+			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Description text of the Choice activity (HTML is supported).",
@@ -133,14 +133,14 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	intro := plan.Intro.ValueString()
+	description := plan.Description.ValueString()
 	allowMultiple := plan.AllowMultiple.ValueBool()
 
 	cmID, err := r.client.AddChoiceToSection(
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
 		plan.Name.ValueString(),
-		intro,
+		description,
 		options,
 		allowMultiple,
 	)
@@ -150,8 +150,8 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 	}
 
 	plan.ID = types.Int64Value(cmID)
-	if plan.Intro.IsNull() || plan.Intro.IsUnknown() {
-		plan.Intro = types.StringValue("")
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
 	}
 	if plan.AllowMultiple.IsNull() || plan.AllowMultiple.IsUnknown() {
 		plan.AllowMultiple = types.BoolValue(false)
@@ -184,7 +184,6 @@ func (r *sectionChoiceResource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *sectionChoiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All attributes have RequiresReplace — Update never called.
 	var plan sectionChoiceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
