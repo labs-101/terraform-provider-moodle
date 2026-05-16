@@ -25,7 +25,7 @@ Creates a Group Choice (groupChoice) activity in a Moodle course section.
 ### Optional
 
 - `allowupdate` (Number) Allow participants to change their choice. 1=yes, 0=no. Default: 0.
-- `intro` (String) Description text (HTML supported).
+- `description` (String) Description text (HTML supported).
 - `multipleenrollmentspossible` (Number) Allow enrolment in multiple groups. 1=yes, 0=no. Default: 0.
 - `previous_element_id` (Number) The cmID of the element this activity should be placed after. 0 means no specific ordering.
 - `showresults` (Number) When to show results: 0=never, 1=after answer, 2=after close, 3=always. Default: 0.
