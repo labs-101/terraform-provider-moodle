@@ -1,4 +1,4 @@
-resource "moodle_choicegroup" "pick_your_team" {
+resource "moodle_group_choice" "pick_your_team" {
   course_id                   = moodle_course.example.id
   section                     = moodle_course_section.choicegroup.section
   name                        = "Pick Your Project Team"
