@@ -64,7 +64,7 @@ resource "moodle_group_choice" "test" {
   course_id                   = moodle_course.cg_course.id
   section                 = 0
   name                        = %[1]q
-  intro                       = "<p>Choose your group.</p>"
+  description                       = "<p>Choose your group.</p>"
   group_ids                   = [moodle_group.cg_group_a.id, moodle_group.cg_group_b.id]
   multipleenrollmentspossible = 0
   showresults                 = 0

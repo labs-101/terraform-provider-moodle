@@ -44,7 +44,7 @@ resource "moodle_course" "quiz_course" {
 resource "moodle_quiz" "test" {
   course_id = moodle_course.quiz_course.id
   name      = %[1]q
-  intro     = "<p>Quiz introduction.</p>"
+  description     = "<p>Quiz introduction.</p>"
   timelimit = 3600
   attempts  = 1
 }
