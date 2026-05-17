@@ -3,15 +3,59 @@ package moodle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
-// CreateLabel erstellt ein Label (Textfeld) in einem Kursabschnitt und gibt die
-// Course Module ID (cmid) zurück. Mit previousElementId > 0 wird das Label
-// direkt vor dem angegebenen Modul positioniert.
+type Label struct {
+	CMID    int64  `json:"cmid"`
+	Name    string `json:"name"`
+	Intro   string `json:"intro"`
+	Section int64  `json:"section"`
+	Visible bool   `json:"visible"`
+}
+
+// GetLabel reads the current state of a label activity by course module ID.
+func (c *MoodleClient) GetLabel(courseID, cmID int64) (*Label, error) {
+	params := url.Values{}
+	params.Add("wstoken", c.Token)
+	params.Add("wsfunction", "local_courseapi_get_label")
+	params.Add("moodlewsrestformat", "json")
+	params.Add("courseid", fmt.Sprintf("%d", courseID))
+	params.Add("cmid", fmt.Sprintf("%d", cmID))
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("GetLabel cm=%d: %w", cmID, err)
+	}
+
+	var raw struct {
+		CMID    int64  `json:"cmid"`
+		Name    string `json:"name"`
+		Intro   string `json:"intro"`
+		Section int64  `json:"section"`
+		Visible int64  `json:"visible"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("parsing label: %w — body: %s", err, string(body))
+	}
+
+	return &Label{
+		CMID:    raw.CMID,
+		Name:    raw.Name,
+		Intro:   raw.Intro,
+		Section: raw.Section,
+		Visible: raw.Visible == 1,
+	}, nil
+}
+
+// CreateLabel creates a label activity in a course section and returns the cmID.
 func (c *MoodleClient) CreateLabel(courseID int64, sectionNum int64, intro string, name string, previousElementId int64) (int64, error) {
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
@@ -23,26 +67,15 @@ func (c *MoodleClient) CreateLabel(courseID int64, sectionNum int64, intro strin
 	params.Add("name", name)
 	params.Add("previousElementId", fmt.Sprintf("%d", previousElementId))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
 	if err != nil {
-		return 0, fmt.Errorf("error creating request: %w", err)
+		return 0, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return 0, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return 0, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return 0, fmt.Errorf("moodle API error creating label: %s", string(body))
+		return 0, fmt.Errorf("CreateLabel: %w", err)
 	}
 
 	var result struct {
@@ -50,15 +83,19 @@ func (c *MoodleClient) CreateLabel(courseID int64, sectionNum int64, intro strin
 		Visible bool  `json:"visible"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return 0, fmt.Errorf("error parsing API response: %w\nBody: %s", err, string(body))
+		return 0, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	return result.CMID, nil
 }
 
-// UpdateLabel aktualisiert den Inhalt und optionale Positionierungsparameter
-// eines bestehenden Labels.
-func (c *MoodleClient) UpdateLabel(courseID int64, cmID int64, intro string, name string, sectionNum int64, previousElementId int64, visible int64) error {
+// UpdateLabel updates an existing label activity.
+func (c *MoodleClient) UpdateLabel(courseID int64, cmID int64, intro string, name string, sectionNum int64, previousElementId int64, visible bool) error {
+	visibleInt := 0
+	if visible {
+		visibleInt = 1
+	}
+
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
 	params.Add("wsfunction", "local_course_api_update_label")
@@ -69,34 +106,22 @@ func (c *MoodleClient) UpdateLabel(courseID int64, cmID int64, intro string, nam
 	params.Add("name", name)
 	params.Add("section", fmt.Sprintf("%d", sectionNum))
 	params.Add("previousElementId", fmt.Sprintf("%d", previousElementId))
-	params.Add("visible", fmt.Sprintf("%d", visible))
+	params.Add("visible", fmt.Sprintf("%d", visibleInt))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API error updating label: %s", string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("UpdateLabel cm=%d: %w", cmID, err)
 	}
 
 	return nil
 }
 
-// DeleteLabel löscht ein Label aus einem Kurs.
+// DeleteLabel deletes a label activity from a course.
 func (c *MoodleClient) DeleteLabel(courseID int64, cmID int64) error {
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
@@ -105,26 +130,14 @@ func (c *MoodleClient) DeleteLabel(courseID int64, cmID int64) error {
 	params.Add("courseid", fmt.Sprintf("%d", courseID))
 	params.Add("cmid", fmt.Sprintf("%d", cmID))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API error deleting label: %s", string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("DeleteLabel cm=%d: %w", cmID, err)
 	}
 
 	return nil

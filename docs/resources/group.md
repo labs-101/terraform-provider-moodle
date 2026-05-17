@@ -33,7 +33,7 @@ resource "moodle_group" "team_one" {
 - `description` (String) A description of the group (HTML supported).
 - `enrolmentkey` (String, Sensitive) Enrolment key for the group. Empty means no key.
 - `idnumber` (String) An optional ID number for the group.
-- `participation` (Number) Whether the group is a participation group. 1=yes, 0=no. Default: 1.
+- `participation` (Boolean) Whether the group is a participation group. Default: true.
 - `visibility` (Number) Visibility: 0=all members, 1=not in group, 2=only members, 3=none. Default: 0.
 
 ### Read-Only

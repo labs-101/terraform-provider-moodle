@@ -18,7 +18,7 @@ resource "moodle_section_file" "file_pdf" {
   section      = moodle_course_section.file.section
   file_path    = "/path/to/file.pdf"
   display_name = "File.pdf"
-  visible      = 1
+  visible      = true
 }
 ```
 
@@ -35,7 +35,7 @@ resource "moodle_section_file" "file_pdf" {
 
 - `display_name` (String) Display name of the file in Moodle. If not specified, the filename is used.
 - `file_hash` (String) MD5 hash of the file. If omitted, computed automatically from file_path. Changes force a re-upload.
-- `visible` (Number) Visibility of the file (1 = visible, 0 = hidden). Default: 1.
+- `visible` (Boolean) Whether the file is visible to students. Default: true.
 
 ### Read-Only
 

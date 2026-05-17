@@ -4,6 +4,6 @@ resource "moodle_course" "example" {
   shortname   = "ec"
   startdate   = "2026-03-10"
   categoryid  = 1
-  visibility  = 1
+  visible     = true
   description = "This is an example course."
 }

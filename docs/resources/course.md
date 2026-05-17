@@ -19,7 +19,7 @@ resource "moodle_course" "example" {
   shortname   = "ec"
   startdate   = "2026-03-10"
   categoryid  = 1
-  visibility  = 1
+  visible     = true
   description = "This is an example course."
 }
 ```
@@ -39,7 +39,7 @@ resource "moodle_course" "example" {
 - `enddate` (String) The end date of the course in format YYYY-MM-DD (e.g. 2026-12-31).
 - `idnumber` (String) The ID number of the course.
 - `startdate` (String) The start date of the course in format YYYY-MM-DD (e.g. 2026-03-07).
-- `visibility` (Number) The visibility of the course (1 = visible, 0 = hidden).
+- `visible` (Boolean) Whether the course is visible to students. Default: true.
 
 ### Read-Only
 

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"terraform-moodle-provider/internal/moodle"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -32,12 +34,12 @@ type groupChoiceResourceModel struct {
 	Name                types.String `tfsdk:"name"`
 	Description         types.String `tfsdk:"description"`
 	GroupIDs            types.List   `tfsdk:"group_ids"`
-	MultipleEnrollments types.Int64  `tfsdk:"multipleenrollmentspossible"`
+	MultipleEnrollments types.Bool   `tfsdk:"multipleenrollmentspossible"`
 	ShowResults         types.Int64  `tfsdk:"showresults"`
-	AllowUpdate         types.Int64  `tfsdk:"allowupdate"`
+	AllowUpdate         types.Bool   `tfsdk:"allowupdate"`
 	TimeOpen            types.String `tfsdk:"timeopen"`
 	TimeClose           types.String `tfsdk:"timeclose"`
-	Visible             types.Int64  `tfsdk:"visible"`
+	Visible             types.Bool   `tfsdk:"visible"`
 	PreviousElementID   types.Int64  `tfsdk:"previous_element_id"`
 }
 
@@ -98,20 +100,26 @@ func (r *groupChoiceResource) Schema(_ context.Context, _ resource.SchemaRequest
 				ElementType: types.Int64Type,
 				Description: "List of group IDs that participants can choose from (at least 1).",
 			},
-			"multipleenrollmentspossible": schema.Int64Attribute{
+			"multipleenrollmentspossible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Allow enrolment in multiple groups. 1=yes, 0=no. Default: 0.",
+				Description: "Allow enrolment in multiple groups. Default: false.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"showresults": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "When to show results: 0=never, 1=after answer, 2=after close, 3=always. Default: 0.",
 			},
-			"allowupdate": schema.Int64Attribute{
+			"allowupdate": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Allow participants to change their choice. 1=yes, 0=no. Default: 0.",
+				Description: "Allow participants to change their choice. Default: false.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"timeopen": schema.StringAttribute{
 				Optional:    true,
@@ -123,10 +131,13 @@ func (r *groupChoiceResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:    true,
 				Description: "Closing date in format YYYY-MM-DD. Empty means no closing date.",
 			},
-			"visible": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Visibility: 1=visible, 0=hidden. Default: 1.",
+				Description: "Whether the activity is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"previous_element_id": schema.Int64Attribute{
 				Optional:    true,
@@ -162,9 +173,17 @@ func (r *groupChoiceResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+	multipleEnrollments := false
+	if !plan.MultipleEnrollments.IsNull() && !plan.MultipleEnrollments.IsUnknown() {
+		multipleEnrollments = plan.MultipleEnrollments.ValueBool()
+	}
+	allowUpdate := false
+	if !plan.AllowUpdate.IsNull() && !plan.AllowUpdate.IsUnknown() {
+		allowUpdate = plan.AllowUpdate.ValueBool()
+	}
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	cmID, err := r.client.CreateChoicegroup(
@@ -173,9 +192,9 @@ func (r *groupChoiceResource) Create(ctx context.Context, req resource.CreateReq
 		plan.Name.ValueString(),
 		plan.Description.ValueString(),
 		groupIDs,
-		plan.MultipleEnrollments.ValueInt64(),
+		multipleEnrollments,
 		plan.ShowResults.ValueInt64(),
-		plan.AllowUpdate.ValueInt64(),
+		allowUpdate,
 		timeOpen,
 		timeClose,
 		visible,
@@ -190,24 +209,18 @@ func (r *groupChoiceResource) Create(ctx context.Context, req resource.CreateReq
 	if plan.Description.IsNull() || plan.Description.IsUnknown() {
 		plan.Description = types.StringValue("")
 	}
-	if plan.MultipleEnrollments.IsNull() || plan.MultipleEnrollments.IsUnknown() {
-		plan.MultipleEnrollments = types.Int64Value(0)
-	}
+	plan.MultipleEnrollments = types.BoolValue(multipleEnrollments)
 	if plan.ShowResults.IsNull() || plan.ShowResults.IsUnknown() {
 		plan.ShowResults = types.Int64Value(0)
 	}
-	if plan.AllowUpdate.IsNull() || plan.AllowUpdate.IsUnknown() {
-		plan.AllowUpdate = types.Int64Value(0)
-	}
+	plan.AllowUpdate = types.BoolValue(allowUpdate)
 	if plan.TimeOpen.IsNull() || plan.TimeOpen.IsUnknown() {
 		plan.TimeOpen = types.StringValue("")
 	}
 	if plan.TimeClose.IsNull() || plan.TimeClose.IsUnknown() {
 		plan.TimeClose = types.StringValue("")
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(visible)
-	}
+	plan.Visible = types.BoolValue(visible)
 	if plan.PreviousElementID.IsNull() || plan.PreviousElementID.IsUnknown() {
 		plan.PreviousElementID = types.Int64Value(0)
 	}
@@ -222,6 +235,33 @@ func (r *groupChoiceResource) Read(ctx context.Context, req resource.ReadRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	cg, err := r.client.GetChoicegroup(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading group choice", err.Error())
+		return
+	}
+
+	state.Name = types.StringValue(cg.Name)
+	state.Description = types.StringValue(cg.Intro)
+	state.Section = types.Int64Value(cg.Section)
+	state.MultipleEnrollments = types.BoolValue(cg.MultipleEnrollments)
+	state.ShowResults = types.Int64Value(cg.ShowResults)
+	state.AllowUpdate = types.BoolValue(cg.AllowUpdate)
+	state.TimeOpen = types.StringValue(unixToDate(cg.TimeOpen))
+	state.TimeClose = types.StringValue(unixToDate(cg.TimeClose))
+	state.Visible = types.BoolValue(cg.Visible)
+
+	groupIDElems := make([]attr.Value, len(cg.GroupIDs))
+	for i, id := range cg.GroupIDs {
+		groupIDElems[i] = types.Int64Value(id)
+	}
+	groupIDList, diags := types.ListValue(types.Int64Type, groupIDElems)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.GroupIDs = groupIDList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -253,12 +293,19 @@ func (r *groupChoiceResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+	multipleEnrollments := false
+	if !plan.MultipleEnrollments.IsNull() && !plan.MultipleEnrollments.IsUnknown() {
+		multipleEnrollments = plan.MultipleEnrollments.ValueBool()
+	}
+	allowUpdate := false
+	if !plan.AllowUpdate.IsNull() && !plan.AllowUpdate.IsUnknown() {
+		allowUpdate = plan.AllowUpdate.ValueBool()
+	}
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
-	// Pass section to allow repositioning.
 	section := plan.Section.ValueInt64()
 
 	err = r.client.UpdateChoicegroup(
@@ -267,9 +314,9 @@ func (r *groupChoiceResource) Update(ctx context.Context, req resource.UpdateReq
 		plan.Name.ValueString(),
 		plan.Description.ValueString(),
 		groupIDs,
-		plan.MultipleEnrollments.ValueInt64(),
+		multipleEnrollments,
 		plan.ShowResults.ValueInt64(),
-		plan.AllowUpdate.ValueInt64(),
+		allowUpdate,
 		timeOpen,
 		timeClose,
 		visible,
@@ -285,24 +332,18 @@ func (r *groupChoiceResource) Update(ctx context.Context, req resource.UpdateReq
 	if plan.Description.IsNull() || plan.Description.IsUnknown() {
 		plan.Description = types.StringValue("")
 	}
-	if plan.MultipleEnrollments.IsNull() || plan.MultipleEnrollments.IsUnknown() {
-		plan.MultipleEnrollments = types.Int64Value(0)
-	}
+	plan.MultipleEnrollments = types.BoolValue(multipleEnrollments)
 	if plan.ShowResults.IsNull() || plan.ShowResults.IsUnknown() {
 		plan.ShowResults = types.Int64Value(0)
 	}
-	if plan.AllowUpdate.IsNull() || plan.AllowUpdate.IsUnknown() {
-		plan.AllowUpdate = types.Int64Value(0)
-	}
+	plan.AllowUpdate = types.BoolValue(allowUpdate)
 	if plan.TimeOpen.IsNull() || plan.TimeOpen.IsUnknown() {
 		plan.TimeOpen = types.StringValue("")
 	}
 	if plan.TimeClose.IsNull() || plan.TimeClose.IsUnknown() {
 		plan.TimeClose = types.StringValue("")
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(visible)
-	}
+	plan.Visible = types.BoolValue(visible)
 	if plan.PreviousElementID.IsNull() || plan.PreviousElementID.IsUnknown() {
 		plan.PreviousElementID = types.Int64Value(0)
 	}

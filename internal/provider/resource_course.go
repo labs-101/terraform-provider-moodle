@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -34,7 +35,7 @@ type courseResourceModel struct {
 	CategoryID  types.Int64  `tfsdk:"categoryid"`
 	Idnumber    types.String `tfsdk:"idnumber"`
 	Description types.String `tfsdk:"description"`
-	Visibility  types.Int64  `tfsdk:"visibility"`
+	Visible     types.Bool   `tfsdk:"visible"`
 	StartDate   types.String `tfsdk:"startdate"`
 	EndDate     types.String `tfsdk:"enddate"`
 }
@@ -99,12 +100,12 @@ func (r *courseResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"visibility": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "The visibility of the course (1 = visible, 0 = hidden).",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
+				Description: "Whether the course is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"startdate": schema.StringAttribute{
@@ -124,61 +125,49 @@ func (r *courseResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
-		tflog.Error(ctx, "Failed to get plan for course creation", map[string]interface{}{
-			"error": resp.Diagnostics,
-		})
 		return
 	}
 
 	startdate, err := parseDateToUnix(plan.StartDate.ValueString())
 	if err != nil {
-		tflog.Error(ctx, "Invalid start date", map[string]interface{}{
-			"startdate": plan.StartDate.ValueString(),
-			"error":     err.Error(),
-		})
 		resp.Diagnostics.AddError("Invalid start date", err.Error())
 		return
 	}
 	enddate, err := parseDateToUnix(plan.EndDate.ValueString())
 	if err != nil {
-		tflog.Error(ctx, "Invalid end date", map[string]any{
-			"enddate": plan.EndDate.ValueString(),
-			"error":   err.Error(),
-		})
 		resp.Diagnostics.AddError("Invalid end date", err.Error())
 		return
+	}
+
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	tflog.Info(ctx, "Creating Moodle course", map[string]any{
 		"fullname":   plan.Fullname.ValueString(),
 		"shortname":  plan.Shortname.ValueString(),
 		"categoryid": plan.CategoryID.ValueInt64(),
-		"idnumber":   plan.Idnumber.ValueString(),
-		"summary":    plan.Description.ValueString(),
-		"visibility": plan.Visibility.ValueInt64(),
-		"startdate":  startdate,
-		"enddate":    enddate,
+		"visible":    visible,
 	})
 
-	course, err := r.client.CreateCourse(plan.Fullname.ValueString(), plan.Shortname.ValueString(), plan.CategoryID.ValueInt64(), plan.Idnumber.ValueString(), plan.Description.ValueString(), plan.Visibility.ValueInt64(), startdate, enddate)
+	course, err := r.client.CreateCourse(
+		plan.Fullname.ValueString(),
+		plan.Shortname.ValueString(),
+		plan.CategoryID.ValueInt64(),
+		plan.Idnumber.ValueString(),
+		plan.Description.ValueString(),
+		visible,
+		startdate,
+		enddate,
+	)
 	if err != nil {
-		tflog.Error(ctx, "Error creating course", map[string]any{
-			"error": err.Error(),
-		})
 		resp.Diagnostics.AddError("Error creating course", err.Error())
 		return
 	}
 
-	tflog.Info(ctx, "Successfully created course", map[string]interface{}{
-		"course_id": course.Id,
-		"fullname":  course.Fullname,
-	})
-
 	plan.ID = types.Int64Value(course.Id)
-
-	if plan.Visibility.IsNull() || plan.Visibility.IsUnknown() {
-		plan.Visibility = types.Int64Value(1) // Moodle default
-	}
+	plan.Visible = types.BoolValue(visible)
 	if plan.Idnumber.IsNull() || plan.Idnumber.IsUnknown() {
 		plan.Idnumber = types.StringValue("")
 	}
@@ -207,7 +196,7 @@ func (r *courseResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.Shortname = types.StringValue(course.Shortname)
 	state.Idnumber = types.StringValue(course.Idnumber)
 	state.Description = types.StringValue(course.Description)
-	state.Visibility = types.Int64Value(course.Visibility)
+	state.Visible = types.BoolValue(course.Visible == 1)
 
 	if startDateStr := unixToDate(course.StartDate); startDateStr == "" {
 		state.StartDate = types.StringNull()
@@ -243,6 +232,11 @@ func (r *courseResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
+	}
+
 	err = r.client.UpdateCourse(
 		plan.ID.ValueInt64(),
 		plan.Fullname.ValueString(),
@@ -250,16 +244,16 @@ func (r *courseResource) Update(ctx context.Context, req resource.UpdateRequest,
 		plan.CategoryID.ValueInt64(),
 		plan.Idnumber.ValueString(),
 		plan.Description.ValueString(),
-		plan.Visibility.ValueInt64(),
+		visible,
 		startdate,
 		enddate,
 	)
-
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating course", err.Error())
 		return
 	}
 
+	plan.Visible = types.BoolValue(visible)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -270,9 +264,7 @@ func (r *courseResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.DeleteCourse(state.ID.ValueInt64())
-	if err != nil {
+	if err := r.client.DeleteCourse(state.ID.ValueInt64()); err != nil {
 		resp.Diagnostics.AddError("Error deleting course", err.Error())
-		return
 	}
 }

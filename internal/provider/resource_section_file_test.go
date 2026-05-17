@@ -23,7 +23,7 @@ func TestAccSectionFileResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_section_file.test", "display_name", "Test Document"),
 					resource.TestCheckResourceAttr("moodle_section_file.test", "section", "0"),
-					resource.TestCheckResourceAttr("moodle_section_file.test", "visible", "1"),
+					resource.TestCheckResourceAttr("moodle_section_file.test", "visible", "true"),
 					resource.TestCheckResourceAttrSet("moodle_section_file.test", "id"),
 				),
 			},
@@ -44,7 +44,7 @@ resource "moodle_section_file" "test" {
   section  = 0
   file_path    = %[1]q
   display_name = "Test Document"
-  visible      = 1
+  visible      = true
 }
 `, filePath)
 }

@@ -18,7 +18,7 @@ resource "moodle_section_label" "intro" {
   section     = moodle_course_section.label.section
   name        = "Welcome"
   description = "<h3>Welcome to the course!</h3><p>Please read the materials below before starting the assignment.</p>"
-  visible     = 1
+  visible     = true
 }
 ```
 
@@ -35,7 +35,7 @@ resource "moodle_section_label" "intro" {
 
 - `name` (String) Internal name of the label (not displayed to students). Defaults to an empty string.
 - `previous_element_id` (Number) Course Module ID of the element before which this label should be inserted. Use 0 to append at the end of the section.
-- `visible` (Number) Visibility of the label (1 = visible, 0 = hidden). Default: 1.
+- `visible` (Boolean) Whether the label is visible to students. Default: true.
 
 ### Read-Only
 

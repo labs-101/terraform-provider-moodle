@@ -45,7 +45,7 @@ resource "moodle_quiz" "midterm" {
 - `timeclose` (String) Closing date in format YYYY-MM-DD. Empty means no closing date.
 - `timelimit` (Number) Time limit in seconds. 0 means no time limit.
 - `timeopen` (String) Opening date in format YYYY-MM-DD. Empty means immediately available.
-- `visible` (Number) Visibility: 1=visible, 0=hidden. Default: 1.
+- `visible` (Boolean) Whether the quiz is visible to students. Default: true.
 
 ### Read-Only
 

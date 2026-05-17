@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -32,7 +33,7 @@ type groupResourceModel struct {
 	Description   types.String `tfsdk:"description"`
 	Enrolmentkey  types.String `tfsdk:"enrolmentkey"`
 	Visibility    types.Int64  `tfsdk:"visibility"`
-	Participation types.Int64  `tfsdk:"participation"`
+	Participation types.Bool   `tfsdk:"participation"`
 	IDNumber      types.String `tfsdk:"idnumber"`
 }
 
@@ -95,10 +96,13 @@ func (r *groupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				Description: "Visibility: 0=all members, 1=not in group, 2=only members, 3=none. Default: 0.",
 			},
-			"participation": schema.Int64Attribute{
+			"participation": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Whether the group is a participation group. 1=yes, 0=no. Default: 1.",
+				Description: "Whether the group is a participation group. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"idnumber": schema.StringAttribute{
 				Optional:    true,
@@ -118,9 +122,10 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	visibility := plan.Visibility.ValueInt64()
-	participation := plan.Participation.ValueInt64()
-	if plan.Participation.IsNull() || plan.Participation.IsUnknown() {
-		participation = 1
+
+	participation := true
+	if !plan.Participation.IsNull() && !plan.Participation.IsUnknown() {
+		participation = plan.Participation.ValueBool()
 	}
 
 	groupID, err := r.client.CreateGroup(
@@ -147,9 +152,7 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if plan.Visibility.IsNull() || plan.Visibility.IsUnknown() {
 		plan.Visibility = types.Int64Value(0)
 	}
-	if plan.Participation.IsNull() || plan.Participation.IsUnknown() {
-		plan.Participation = types.Int64Value(participation)
-	}
+	plan.Participation = types.BoolValue(participation)
 	if plan.IDNumber.IsNull() || plan.IDNumber.IsUnknown() {
 		plan.IDNumber = types.StringValue("")
 	}
@@ -165,7 +168,19 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// No dedicated read endpoint in the custom API — keep existing state.
+	group, err := r.client.GetGroup(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading group", err.Error())
+		return
+	}
+
+	state.Name = types.StringValue(group.Name)
+	state.Description = types.StringValue(group.Description)
+	state.Enrolmentkey = types.StringValue(group.EnrolmentKey)
+	state.Visibility = types.Int64Value(group.Visibility)
+	state.Participation = types.BoolValue(group.Participation)
+	state.IDNumber = types.StringValue(group.IDNumber)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -179,9 +194,9 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	participation := plan.Participation.ValueInt64()
-	if plan.Participation.IsNull() || plan.Participation.IsUnknown() {
-		participation = 1
+	participation := true
+	if !plan.Participation.IsNull() && !plan.Participation.IsUnknown() {
+		participation = plan.Participation.ValueBool()
 	}
 
 	err := r.client.UpdateGroup(
@@ -208,9 +223,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if plan.Visibility.IsNull() || plan.Visibility.IsUnknown() {
 		plan.Visibility = types.Int64Value(0)
 	}
-	if plan.Participation.IsNull() || plan.Participation.IsUnknown() {
-		plan.Participation = types.Int64Value(participation)
-	}
+	plan.Participation = types.BoolValue(participation)
 	if plan.IDNumber.IsNull() || plan.IDNumber.IsUnknown() {
 		plan.IDNumber = types.StringValue("")
 	}

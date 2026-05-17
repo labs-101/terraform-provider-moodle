@@ -3,19 +3,20 @@ package moodle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 )
 
+// Course represents a Moodle course as returned by core_course_get_courses_by_field.
+// Visible is int64 because the core API returns 0/1, not JSON booleans.
 type Course struct {
 	Id          int64  `json:"id"`
 	Shortname   string `json:"shortname"`
 	Fullname    string `json:"fullname"`
 	Idnumber    string `json:"idnumber"`
 	Description string `json:"summary"`
-	Visibility  int64  `json:"visible"`
+	Visible     int64  `json:"visible"`
 	StartDate   int64  `json:"startdate"`
 	EndDate     int64  `json:"enddate"`
 }
@@ -25,34 +26,28 @@ func (c *MoodleClient) GetAllCourses() ([]Course, error) {
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API error: %s", string(body))
+		return nil, fmt.Errorf("GetAllCourses: %w", err)
 	}
 
 	var courses []Course
-	err = json.Unmarshal(body, &courses)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing JSON (invalid format?): %w\nBody was: %s", err, string(body))
+	if err := json.Unmarshal(body, &courses); err != nil {
+		return nil, fmt.Errorf("parsing courses: %w — body: %s", err, string(body))
 	}
 
 	return courses, nil
 }
 
-func (c *MoodleClient) CreateCourse(fullname, shortname string, categoryID int64, idnumber string, summary string, visibility int64, startdate int64, enddate int64) (*Course, error) {
+func (c *MoodleClient) CreateCourse(fullname, shortname string, categoryID int64, idnumber string, summary string, visible bool, startdate int64, enddate int64) (*Course, error) {
+	visibleInt := 0
+	if visible {
+		visibleInt = 1
+	}
+
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
 	params.Add("wsfunction", "core_course_create_courses")
@@ -62,7 +57,7 @@ func (c *MoodleClient) CreateCourse(fullname, shortname string, categoryID int64
 	params.Add("courses[0][categoryid]", fmt.Sprintf("%d", categoryID))
 	params.Add("courses[0][idnumber]", idnumber)
 	params.Add("courses[0][summary]", summary)
-	params.Add("courses[0][visible]", fmt.Sprintf("%d", visibility))
+	params.Add("courses[0][visible]", fmt.Sprintf("%d", visibleInt))
 	params.Add("courses[0][startdate]", fmt.Sprintf("%d", startdate))
 	params.Add("courses[0][enddate]", fmt.Sprintf("%d", enddate))
 
@@ -70,32 +65,21 @@ func (c *MoodleClient) CreateCourse(fullname, shortname string, categoryID int64
 
 	req, err := http.NewRequest("POST", reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler: %s", string(body))
+		return nil, fmt.Errorf("CreateCourse: %w", err)
 	}
 
 	var courses []Course
-	err = json.Unmarshal(body, &courses)
-	if err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen des JSON: %w\nBody: %s", err, string(body))
+	if err := json.Unmarshal(body, &courses); err != nil {
+		return nil, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	if len(courses) == 0 {
-		return nil, fmt.Errorf("moodle hat keinen Kurs zurückgegeben")
+		return nil, fmt.Errorf("CreateCourse: moodle returned no course")
 	}
 
 	return &courses[0], nil
@@ -109,38 +93,25 @@ func (c *MoodleClient) GetCourse(id int64) (*Course, error) {
 	params.Add("field", "id")
 	params.Add("value", fmt.Sprintf("%d", id))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler: %s", string(body))
+		return nil, fmt.Errorf("GetCourse %d: %w", id, err)
 	}
 
 	var result struct {
 		Courses []Course `json:"courses"`
 	}
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen des JSON: %w\nBody: %s", err, string(body))
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	if len(result.Courses) == 0 {
-		return nil, fmt.Errorf("kurs mit ID %d nicht gefunden", id)
+		return nil, fmt.Errorf("course with ID %d not found", id)
 	}
 
 	return &result.Courses[0], nil
@@ -153,84 +124,46 @@ func (c *MoodleClient) DeleteCourse(id int64) error {
 	params.Add("moodlewsrestformat", "json")
 	params.Add("courseids[0]", fmt.Sprintf("%d", id))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("DELETE", reqURL, nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fehler beim Senden des Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API Fehler: %s", string(body))
-	}
-
-	type MoodleWarning struct {
-		Item        string `json:"item,omitempty"`
-		ItemID      int    `json:"itemid,omitempty"`
-		WarningCode string `json:"warningcode,omitempty"`
-		Message     string `json:"message,omitempty"`
-	}
-
-	var result struct {
-		Warnings []MoodleWarning `json:"warnings"`
-	}
-
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return fmt.Errorf("fehler beim Parsen des JSON: %w\nBody: %s", err, string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("DeleteCourse %d: %w", id, err)
 	}
 
 	return nil
 }
 
-func (c *MoodleClient) UpdateCourse(id int64, fullname, shortname string, categoryID int64, idnumber string, summary string, visibility int64, startdate int64, enddate int64) error {
+func (c *MoodleClient) UpdateCourse(id int64, fullname, shortname string, categoryID int64, idnumber string, summary string, visible bool, startdate int64, enddate int64) error {
+	visibleInt := 0
+	if visible {
+		visibleInt = 1
+	}
+
 	params := url.Values{}
 	params.Add("wstoken", c.Token)
 	params.Add("wsfunction", "core_course_update_courses")
 	params.Add("moodlewsrestformat", "json")
-
 	params.Add("courses[0][id]", fmt.Sprintf("%d", id))
 	params.Add("courses[0][fullname]", fullname)
 	params.Add("courses[0][shortname]", shortname)
 	params.Add("courses[0][categoryid]", fmt.Sprintf("%d", categoryID))
 	params.Add("courses[0][idnumber]", idnumber)
 	params.Add("courses[0][summary]", summary)
-	params.Add("courses[0][visible]", fmt.Sprintf("%d", visibility))
+	params.Add("courses[0][visible]", fmt.Sprintf("%d", visibleInt))
 	params.Add("courses[0][startdate]", fmt.Sprintf("%d", startdate))
 	params.Add("courses[0][enddate]", fmt.Sprintf("%d", enddate))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
-
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
 	if err != nil {
-		return fmt.Errorf("fehler beim Erstellen des Update-Requests: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fehler beim Senden des Update-Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API Fehler beim Update: %s", string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("UpdateCourse %d: %w", id, err)
 	}
 
 	return nil
@@ -243,26 +176,14 @@ func (c *MoodleClient) GetCourseModule(courseID int64, cmID int64) (*CourseModul
 	params.Add("moodlewsrestformat", "json")
 	params.Add("courseid", fmt.Sprintf("%d", courseID))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Erstellen des Requests: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("fehler beim Senden des Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("fehler beim Lesen der API-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API Fehler beim Lesen der Kursinhalte: %s", string(body))
+		return nil, fmt.Errorf("GetCourseModule course=%d cm=%d: %w", courseID, cmID, err)
 	}
 
 	var sections []struct {
@@ -273,7 +194,7 @@ func (c *MoodleClient) GetCourseModule(courseID int64, cmID int64) (*CourseModul
 		} `json:"modules"`
 	}
 	if err := json.Unmarshal(body, &sections); err != nil {
-		return nil, fmt.Errorf("fehler beim Parsen der Kursinhalte: %w\nBody: %s", err, string(body))
+		return nil, fmt.Errorf("parsing course contents: %w — body: %s", err, string(body))
 	}
 
 	for _, section := range sections {
@@ -298,27 +219,14 @@ func (c *MoodleClient) DeleteCourseModule(cmID int64) error {
 	params.Add("moodlewsrestformat", "json")
 	params.Add("cmids[0]", fmt.Sprintf("%d", cmID))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php", c.Host)
-
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
 	if err != nil {
-		return fmt.Errorf("fehler beim Erstellen des Delete-Requests: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("fehler beim Senden des Delete-Requests: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("fehler beim Lesen der Delete-Antwort: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API Fehler beim Löschen des Moduls: %s", string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("DeleteCourseModule cm=%d: %w", cmID, err)
 	}
 
 	return nil

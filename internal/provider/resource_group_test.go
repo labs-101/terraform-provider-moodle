@@ -17,7 +17,7 @@ func TestAccGroupResource(t *testing.T) {
 					resource.TestCheckResourceAttr("moodle_group.test", "name", "Team Alpha"),
 					resource.TestCheckResourceAttr("moodle_group.test", "description", "<p>First group.</p>"),
 					resource.TestCheckResourceAttr("moodle_group.test", "visibility", "0"),
-					resource.TestCheckResourceAttr("moodle_group.test", "participation", "1"),
+					resource.TestCheckResourceAttr("moodle_group.test", "participation", "true"),
 					resource.TestCheckResourceAttrSet("moodle_group.test", "id"),
 					resource.TestCheckResourceAttrSet("moodle_group.test", "course_id"),
 				),
@@ -45,7 +45,7 @@ resource "moodle_group" "test" {
   name          = %[1]q
   description   = "<p>First group.</p>"
   visibility    = 0
-  participation = 1
+  participation = true
   enrolmentkey  = ""
   idnumber      = ""
 }

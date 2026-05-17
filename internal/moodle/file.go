@@ -1,7 +1,6 @@
 package moodle
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,103 +27,93 @@ type uploadFileResponse struct {
 func (c *MoodleClient) UploadFile(filePath string) (int64, string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		return 0, "", fmt.Errorf("error opening file %q: %w", filePath, err)
+		return 0, "", fmt.Errorf("opening file %q: %w", filePath, err)
 	}
 	defer f.Close()
 
 	filename := filepath.Base(filePath)
 
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
 
-	part, err := mw.CreateFormFile("file", filename)
-	if err != nil {
-		return 0, "", fmt.Errorf("error creating multipart field: %w", err)
-	}
-	if _, err = io.Copy(part, f); err != nil {
-		return 0, "", fmt.Errorf("error reading file: %w", err)
-	}
-	mw.Close()
+	go func() {
+		defer pw.Close()
+		part, err := mw.CreateFormFile("file", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		if _, err := io.Copy(part, f); err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+		mw.Close()
+	}()
 
 	uploadURL := fmt.Sprintf("%s/webservice/upload.php?token=%s&moodlewsrestformat=json", c.Host, c.Token)
 
-	req, err := http.NewRequest("POST", uploadURL, &buf)
+	req, err := http.NewRequest("POST", uploadURL, pr)
 	if err != nil {
-		return 0, "", fmt.Errorf("error creating upload request: %w", err)
+		return 0, "", fmt.Errorf("creating upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return 0, "", fmt.Errorf("error sending upload request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return 0, "", fmt.Errorf("error reading upload response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return 0, "", fmt.Errorf("moodle upload error: %s", string(body))
+		return 0, "", fmt.Errorf("UploadFile %q: %w", filename, err)
 	}
 
 	var uploads []uploadFileResponse
 	if err := json.Unmarshal(body, &uploads); err != nil {
-		return 0, "", fmt.Errorf("error parsing upload response: %w\nBody: %s", err, string(body))
+		return 0, "", fmt.Errorf("parsing upload response: %w — body: %s", err, string(body))
 	}
 
 	if len(uploads) == 0 {
-		return 0, "", fmt.Errorf("moodle returned no upload response")
+		return 0, "", fmt.Errorf("UploadFile: moodle returned no upload response")
 	}
 
 	return uploads[0].ItemID, uploads[0].Filename, nil
 }
 
-func (c *MoodleClient) AddFileToSection(courseID int64, sectionNum int64, itemID int64, displayName string, visible int64) (int64, error) {
+func (c *MoodleClient) AddFileToSection(courseID int64, sectionNum int64, itemID int64, displayName string, visible bool) (int64, error) {
+	visibleInt := 0
+	if visible {
+		visibleInt = 1
+	}
+
 	params := url.Values{}
 	params.Add("itemid", fmt.Sprintf("%d", itemID))
 	params.Add("courseid", fmt.Sprintf("%d", courseID))
 	params.Add("sectionnum", fmt.Sprintf("%d", sectionNum))
 	params.Add("displayname", displayName)
-	params.Add("visible", fmt.Sprintf("%d", visible))
+	params.Add("visible", fmt.Sprintf("%d", visibleInt))
 
 	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?wstoken=%s&wsfunction=local_course_add_new_course_module_resource&moodlewsrestformat=json",
 		c.Host, c.Token)
 
 	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
 	if err != nil {
-		return 0, fmt.Errorf("error creating request: %w", err)
+		return 0, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return 0, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return 0, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return 0, fmt.Errorf("moodle API error adding file: %s", string(body))
+		return 0, fmt.Errorf("AddFileToSection: %w", err)
 	}
 
 	var result struct {
 		Message string `json:"message"`
-		Id      string `json:"id"`
+		ID      string `json:"id"`
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return -1, fmt.Errorf("error parsing course contents: %w\nBody: %s", err, string(body))
+		return -1, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
-	id, err := strconv.ParseInt(result.Id, 10, 64)
+	id, err := strconv.ParseInt(result.ID, 10, 64)
 	if err != nil {
-		return -1, fmt.Errorf("could not parse ID as int64: %w", err)
+		return -1, fmt.Errorf("parsing ID as int64: %w", err)
 	}
 
 	return id, nil

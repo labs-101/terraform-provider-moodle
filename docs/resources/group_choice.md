@@ -13,18 +13,18 @@ Creates a Group Choice (groupChoice) activity in a Moodle course section.
 ## Example Usage
 
 ```terraform
-resource "moodle_choicegroup" "pick_your_team" {
+resource "moodle_group_choice" "pick_your_team" {
   course_id                   = moodle_course.example.id
   section                     = moodle_course_section.choicegroup.section
   name                        = "Pick Your Project Team"
   description                 = "<p>Please select the group you want to join.</p>"
   group_ids                   = [moodle_group.team_alpha.id, moodle_group.team_beta.id]
-  multipleenrollmentspossible = 0
-  showresults                 = 1
-  allowupdate                 = 1
+  multipleenrollmentspossible = false
+  showresults                 = true
+  allowupdate                 = true
   timeopen                    = "2026-05-01"
   timeclose                   = "2026-05-15"
-  visible                     = 1
+  visible                     = true
 }
 ```
 
@@ -40,14 +40,14 @@ resource "moodle_choicegroup" "pick_your_team" {
 
 ### Optional
 
-- `allowupdate` (Number) Allow participants to change their choice. 1=yes, 0=no. Default: 0.
+- `allowupdate` (Boolean) Allow participants to change their choice. Default: false.
 - `description` (String) Description text (HTML supported).
-- `multipleenrollmentspossible` (Number) Allow enrolment in multiple groups. 1=yes, 0=no. Default: 0.
+- `multipleenrollmentspossible` (Boolean) Allow enrolment in multiple groups. Default: false.
 - `previous_element_id` (Number) The cmID of the element this activity should be placed after. 0 means no specific ordering.
 - `showresults` (Number) When to show results: 0=never, 1=after answer, 2=after close, 3=always. Default: 0.
 - `timeclose` (String) Closing date in format YYYY-MM-DD. Empty means no closing date.
 - `timeopen` (String) Opening date in format YYYY-MM-DD. Empty means immediately available.
-- `visible` (Number) Visibility: 1=visible, 0=hidden. Default: 1.
+- `visible` (Boolean) Whether the activity is visible to students. Default: true.
 
 ### Read-Only
 

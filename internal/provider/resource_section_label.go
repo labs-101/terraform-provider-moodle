@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -32,7 +33,7 @@ type sectionLabelResourceModel struct {
 	Description       types.String `tfsdk:"description"`
 	Name              types.String `tfsdk:"name"`
 	PreviousElementId types.Int64  `tfsdk:"previous_element_id"`
-	Visible           types.Int64  `tfsdk:"visible"`
+	Visible           types.Bool   `tfsdk:"visible"`
 }
 
 func (r *sectionLabelResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -92,10 +93,13 @@ func (r *sectionLabelResource) Schema(_ context.Context, _ resource.SchemaReques
 				Computed:    true,
 				Description: "Course Module ID of the element before which this label should be inserted. Use 0 to append at the end of the section.",
 			},
-			"visible": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Visibility of the label (1 = visible, 0 = hidden). Default: 1.",
+				Description: "Whether the label is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -115,6 +119,11 @@ func (r *sectionLabelResource) Create(ctx context.Context, req resource.CreateRe
 		previousElementId = plan.PreviousElementId.ValueInt64()
 	}
 
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
+	}
+
 	cmID, err := r.client.CreateLabel(
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
@@ -127,6 +136,22 @@ func (r *sectionLabelResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	// CreateLabel doesn't accept a visible param — set visibility if false.
+	if !visible {
+		if err := r.client.UpdateLabel(
+			plan.CourseID.ValueInt64(),
+			cmID,
+			plan.Description.ValueString(),
+			name,
+			plan.Section.ValueInt64(),
+			previousElementId,
+			false,
+		); err != nil {
+			resp.Diagnostics.AddError("Error setting label visibility", err.Error())
+			return
+		}
+	}
+
 	plan.ID = types.Int64Value(cmID)
 	if plan.Name.IsNull() || plan.Name.IsUnknown() {
 		plan.Name = types.StringValue("")
@@ -134,9 +159,7 @@ func (r *sectionLabelResource) Create(ctx context.Context, req resource.CreateRe
 	if plan.PreviousElementId.IsNull() || plan.PreviousElementId.IsUnknown() {
 		plan.PreviousElementId = types.Int64Value(previousElementId)
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(1)
-	}
+	plan.Visible = types.BoolValue(visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -149,18 +172,17 @@ func (r *sectionLabelResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	label, err := r.client.GetLabel(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading label", err.Error())
 		return
 	}
 
-	if module == nil {
-		resp.State.RemoveResource(ctx)
-		return
-	}
+	state.Name = types.StringValue(label.Name)
+	state.Description = types.StringValue(label.Intro)
+	state.Section = types.Int64Value(label.Section)
+	state.Visible = types.BoolValue(label.Visible)
 
-	state.Name = types.StringValue(module.Name)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -174,9 +196,9 @@ func (r *sectionLabelResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	visible := int64(1)
+	visible := true
 	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
-		visible = plan.Visible.ValueInt64()
+		visible = plan.Visible.ValueBool()
 	}
 
 	previousElementId := int64(0)
@@ -205,9 +227,7 @@ func (r *sectionLabelResource) Update(ctx context.Context, req resource.UpdateRe
 	if plan.PreviousElementId.IsNull() || plan.PreviousElementId.IsUnknown() {
 		plan.PreviousElementId = types.Int64Value(previousElementId)
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(visible)
-	}
+	plan.Visible = types.BoolValue(visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

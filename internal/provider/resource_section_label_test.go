@@ -15,7 +15,7 @@ func TestAccSectionLabelResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_section_label.test", "description", "<p>Gültig ab dem <strong>18.04.2026</strong>.</p>"),
 					resource.TestCheckResourceAttr("moodle_section_label.test", "section", "1"),
-					resource.TestCheckResourceAttr("moodle_section_label.test", "visible", "1"),
+					resource.TestCheckResourceAttr("moodle_section_label.test", "visible", "true"),
 					resource.TestCheckResourceAttrSet("moodle_section_label.test", "id"),
 					resource.TestCheckResourceAttrSet("moodle_section_label.test", "course_id"),
 				),
@@ -24,7 +24,7 @@ func TestAccSectionLabelResource(t *testing.T) {
 				Config: testAccSectionLabelConfigUpdated(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_section_label.test", "description", "<p>Aktualisiert: Gültig ab dem <strong>18.04.2026</strong>.</p>"),
-					resource.TestCheckResourceAttr("moodle_section_label.test", "visible", "1"),
+					resource.TestCheckResourceAttr("moodle_section_label.test", "visible", "true"),
 					resource.TestCheckResourceAttrSet("moodle_section_label.test", "id"),
 				),
 			},
@@ -42,9 +42,9 @@ resource "moodle_course" "label_course" {
 
 resource "moodle_section_label" "test" {
   course_id   = moodle_course.label_course.id
-  section = 1
-  description       = "<p>Gültig ab dem <strong>18.04.2026</strong>.</p>"
-  visible     = 1
+  section     = 1
+  description = "<p>Gültig ab dem <strong>18.04.2026</strong>.</p>"
+  visible     = true
 }
 `
 }
@@ -59,9 +59,9 @@ resource "moodle_course" "label_course" {
 
 resource "moodle_section_label" "test" {
   course_id   = moodle_course.label_course.id
-  section = 1
-  description       = "<p>Aktualisiert: Gültig ab dem <strong>18.04.2026</strong>.</p>"
-  visible     = 1
+  section     = 1
+  description = "<p>Aktualisiert: Gültig ab dem <strong>18.04.2026</strong>.</p>"
+  visible     = true
 }
 `
 }

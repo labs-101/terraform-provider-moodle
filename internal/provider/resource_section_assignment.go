@@ -7,9 +7,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -37,6 +37,7 @@ type sectionAssignmentResourceModel struct {
 	MaxBytes                 types.Int64  `tfsdk:"maxbytes"`
 	MaxFileSubmissions       types.Int64  `tfsdk:"maxfilesubmissions"`
 	SubmissionTypes          types.String `tfsdk:"submissiontypes"`
+	Visible                  types.Bool   `tfsdk:"visible"`
 }
 
 func (r *sectionAssignmentResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -88,56 +89,43 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "The display name of the assignment.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Assignment description (HTML is supported).",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"duedate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Due date in format YYYY-MM-DD (e.g. 2026-06-30). Empty means no due date.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"allowsubmissionsfromdate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Start date for submissions in format YYYY-MM-DD. Empty means immediately.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"maxbytes": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Maximum file size in bytes. 0 means unlimited.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 			},
 			"maxfilesubmissions": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Maximum number of file submissions. Default: 1.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
 			},
 			"submissiontypes": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Submission types as comma-separated list. Possible values: onlinetext, file. Default: onlinetext.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+			},
+			"visible": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "Whether the assignment is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -152,7 +140,6 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
-	// Defaults for optional fields
 	description := plan.Description.ValueString()
 	maxBytes := plan.MaxBytes.ValueInt64()
 	maxFiles := plan.MaxFileSubmissions.ValueInt64()
@@ -175,6 +162,11 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
+	}
+
 	cmID, err := r.client.AddAssignmentToSection(
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
@@ -189,6 +181,25 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating assignment", err.Error())
 		return
+	}
+
+	// AddAssignmentToSection doesn't accept visible — hide immediately if needed.
+	if !visible {
+		if err := r.client.UpdateAssignment(
+			plan.CourseID.ValueInt64(),
+			cmID,
+			plan.Name.ValueString(),
+			description,
+			dueDate,
+			allowFrom,
+			maxBytes,
+			maxFiles,
+			submissionTypes,
+			false,
+		); err != nil {
+			resp.Diagnostics.AddError("Error setting assignment visibility", err.Error())
+			return
+		}
 	}
 
 	plan.ID = types.Int64Value(cmID)
@@ -210,6 +221,7 @@ func (r *sectionAssignmentResource) Create(ctx context.Context, req resource.Cre
 	if plan.SubmissionTypes.IsNull() || plan.SubmissionTypes.IsUnknown() {
 		plan.SubmissionTypes = types.StringValue(submissionTypes)
 	}
+	plan.Visible = types.BoolValue(visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -222,27 +234,99 @@ func (r *sectionAssignmentResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	assignment, err := r.client.GetAssignment(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Fehler beim Lesen der Aufgabe", err.Error())
+		resp.Diagnostics.AddError("Error reading assignment", err.Error())
 		return
 	}
 
-	if module == nil {
-		resp.State.RemoveResource(ctx)
-		return
-	}
+	state.Name = types.StringValue(assignment.Name)
+	state.Description = types.StringValue(assignment.Intro)
+	state.DueDate = types.StringValue(unixToDate(assignment.DueDate))
+	state.AllowSubmissionsFromDate = types.StringValue(unixToDate(assignment.AllowSubmissionsFromDate))
+	state.MaxBytes = types.Int64Value(assignment.MaxBytes)
+	state.MaxFileSubmissions = types.Int64Value(assignment.MaxFileSubmissions)
+	state.SubmissionTypes = types.StringValue(assignment.SubmissionTypes)
+	state.Visible = types.BoolValue(assignment.Visible)
 
-	state.Name = types.StringValue(module.Name)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *sectionAssignmentResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan sectionAssignmentResourceModel
+	var state sectionAssignmentResourceModel
+
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	description := plan.Description.ValueString()
+	maxBytes := plan.MaxBytes.ValueInt64()
+	maxFiles := plan.MaxFileSubmissions.ValueInt64()
+	if plan.MaxFileSubmissions.IsNull() || plan.MaxFileSubmissions.IsUnknown() {
+		maxFiles = 1
+	}
+	submissionTypes := plan.SubmissionTypes.ValueString()
+	if plan.SubmissionTypes.IsNull() || plan.SubmissionTypes.IsUnknown() || submissionTypes == "" {
+		submissionTypes = "onlinetext"
+	}
+
+	dueDate, err := parseDateToUnix(plan.DueDate.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid due date", err.Error())
+		return
+	}
+	allowFrom, err := parseDateToUnix(plan.AllowSubmissionsFromDate.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid start date for submissions", err.Error())
+		return
+	}
+
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
+	}
+
+	err = r.client.UpdateAssignment(
+		state.CourseID.ValueInt64(),
+		state.ID.ValueInt64(),
+		plan.Name.ValueString(),
+		description,
+		dueDate,
+		allowFrom,
+		maxBytes,
+		maxFiles,
+		submissionTypes,
+		visible,
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating assignment", err.Error())
+		return
+	}
+
+	plan.ID = state.ID
+	if plan.Description.IsNull() || plan.Description.IsUnknown() {
+		plan.Description = types.StringValue("")
+	}
+	if plan.DueDate.IsNull() || plan.DueDate.IsUnknown() {
+		plan.DueDate = types.StringValue("")
+	}
+	if plan.AllowSubmissionsFromDate.IsNull() || plan.AllowSubmissionsFromDate.IsUnknown() {
+		plan.AllowSubmissionsFromDate = types.StringValue("")
+	}
+	if plan.MaxBytes.IsNull() || plan.MaxBytes.IsUnknown() {
+		plan.MaxBytes = types.Int64Value(0)
+	}
+	if plan.MaxFileSubmissions.IsNull() || plan.MaxFileSubmissions.IsUnknown() {
+		plan.MaxFileSubmissions = types.Int64Value(maxFiles)
+	}
+	if plan.SubmissionTypes.IsNull() || plan.SubmissionTypes.IsUnknown() {
+		plan.SubmissionTypes = types.StringValue(submissionTypes)
+	}
+	plan.Visible = types.BoolValue(visible)
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -255,6 +339,6 @@ func (r *sectionAssignmentResource) Delete(ctx context.Context, req resource.Del
 	}
 
 	if err := r.client.DeleteCourseModule(state.ID.ValueInt64()); err != nil {
-		resp.Diagnostics.AddError("Fehler beim Löschen der Aufgabe", err.Error())
+		resp.Diagnostics.AddError("Error deleting assignment", err.Error())
 	}
 }

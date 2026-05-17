@@ -7,8 +7,10 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -39,7 +41,7 @@ type quizResourceModel struct {
 	QuestionsPerPage types.Int64  `tfsdk:"questionsperpage"`
 	NavMethod        types.String `tfsdk:"navmethod"`
 	Section          types.Int64  `tfsdk:"section"`
-	Visible          types.Int64  `tfsdk:"visible"`
+	Visible          types.Bool   `tfsdk:"visible"`
 }
 
 func (r *quizResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -95,6 +97,9 @@ func (r *quizResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:    true,
 				Sensitive:   true,
 				Description: "Password required to access the quiz. Empty means no password.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"timeopen": schema.StringAttribute{
 				Optional:    true,
@@ -120,26 +125,38 @@ func (r *quizResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Computed:    true,
 				Description: "Grading method: 1=Highest, 2=Average, 3=First, 4=Last.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"questionsperpage": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Number of questions per page. Default: 1.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"navmethod": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Navigation method: 'free' or 'sequential'. Default: 'free'.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"section": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "The section number (0-based) to place the quiz in. Default: 0.",
 			},
-			"visible": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Visibility: 1=visible, 0=hidden. Default: 1.",
+				Description: "Whether the quiz is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -182,9 +199,10 @@ func (r *quizResource) Create(ctx context.Context, req resource.CreateRequest, r
 		questionsPerPage = 1
 	}
 	section := plan.Section.ValueInt64()
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	quizID, err := r.client.CreateQuiz(
@@ -238,9 +256,7 @@ func (r *quizResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if plan.Section.IsNull() || plan.Section.IsUnknown() {
 		plan.Section = types.Int64Value(section)
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(visible)
-	}
+	plan.Visible = types.BoolValue(visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -252,6 +268,25 @@ func (r *quizResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	quiz, err := r.client.GetQuiz(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading quiz", err.Error())
+		return
+	}
+
+	state.Name = types.StringValue(quiz.Name)
+	state.Description = types.StringValue(quiz.Intro)
+	state.Password = types.StringValue(quiz.QuizPassword)
+	state.TimeOpen = types.StringValue(unixToDate(quiz.TimeOpen))
+	state.TimeClose = types.StringValue(unixToDate(quiz.TimeClose))
+	state.TimeLimit = types.Int64Value(quiz.TimeLimit)
+	state.Attempts = types.Int64Value(quiz.Attempts)
+	state.GradeMethod = types.Int64Value(quiz.GradeMethod)
+	state.QuestionsPerPage = types.Int64Value(quiz.QuestionsPerPage)
+	state.NavMethod = types.StringValue(quiz.NavMethod)
+	state.Section = types.Int64Value(quiz.Section)
+	state.Visible = types.BoolValue(quiz.Visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -299,9 +334,10 @@ func (r *quizResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		questionsPerPage = 1
 	}
 	section := plan.Section.ValueInt64()
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	err = r.client.UpdateQuiz(
@@ -355,9 +391,7 @@ func (r *quizResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if plan.Section.IsNull() || plan.Section.IsUnknown() {
 		plan.Section = types.Int64Value(section)
 	}
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		plan.Visible = types.Int64Value(visible)
-	}
+	plan.Visible = types.BoolValue(visible)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

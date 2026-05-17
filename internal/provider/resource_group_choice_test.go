@@ -16,10 +16,10 @@ func TestAccGroupChoiceResource(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("moodle_group_choice.test", "name", "Pick Your Team"),
 					resource.TestCheckResourceAttr("moodle_group_choice.test", "section", "0"),
-					resource.TestCheckResourceAttr("moodle_group_choice.test", "visible", "1"),
-					resource.TestCheckResourceAttr("moodle_group_choice.test", "multipleenrollmentspossible", "0"),
+					resource.TestCheckResourceAttr("moodle_group_choice.test", "visible", "true"),
+					resource.TestCheckResourceAttr("moodle_group_choice.test", "multipleenrollmentspossible", "false"),
 					resource.TestCheckResourceAttr("moodle_group_choice.test", "showresults", "0"),
-					resource.TestCheckResourceAttr("moodle_group_choice.test", "allowupdate", "0"),
+					resource.TestCheckResourceAttr("moodle_group_choice.test", "allowupdate", "false"),
 					resource.TestCheckResourceAttrSet("moodle_group_choice.test", "id"),
 					resource.TestCheckResourceAttrSet("moodle_group_choice.test", "course_id"),
 				),
@@ -46,7 +46,7 @@ resource "moodle_group" "cg_group_a" {
   course_id     = moodle_course.cg_course.id
   name          = "Group A"
   visibility    = 0
-  participation = 1
+  participation = true
   enrolmentkey  = ""
   idnumber      = ""
 }
@@ -55,21 +55,21 @@ resource "moodle_group" "cg_group_b" {
   course_id     = moodle_course.cg_course.id
   name          = "Group B"
   visibility    = 0
-  participation = 1
+  participation = true
   enrolmentkey  = ""
   idnumber      = ""
 }
 
 resource "moodle_group_choice" "test" {
   course_id                   = moodle_course.cg_course.id
-  section                 = 0
+  section                     = 0
   name                        = %[1]q
-  description                       = "<p>Choose your group.</p>"
+  description                 = "<p>Choose your group.</p>"
   group_ids                   = [moodle_group.cg_group_a.id, moodle_group.cg_group_b.id]
-  multipleenrollmentspossible = 0
+  multipleenrollmentspossible = false
   showresults                 = 0
-  allowupdate                 = 0
-  visible                     = 1
+  allowupdate                 = false
+  visible                     = true
   previous_element_id         = 0
 }
 `, name)

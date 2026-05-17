@@ -39,6 +39,7 @@ resource "moodle_section_assignment" "project_submission" {
 - `maxbytes` (Number) Maximum file size in bytes. 0 means unlimited.
 - `maxfilesubmissions` (Number) Maximum number of file submissions. Default: 1.
 - `submissiontypes` (String) Submission types as comma-separated list. Possible values: onlinetext, file. Default: onlinetext.
+- `visible` (Boolean) Whether the assignment is visible to students. Default: true.
 
 ### Read-Only
 

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -94,10 +95,10 @@ type sectionFileResource struct {
 type sectionFileResourceModel struct {
 	ID          types.Int64  `tfsdk:"id"`
 	CourseID    types.Int64  `tfsdk:"course_id"`
-	Section  types.Int64  `tfsdk:"section"`
+	Section     types.Int64  `tfsdk:"section"`
 	FilePath    types.String `tfsdk:"file_path"`
 	DisplayName types.String `tfsdk:"display_name"`
-	Visible     types.Int64  `tfsdk:"visible"`
+	Visible     types.Bool   `tfsdk:"visible"`
 	FileHash    types.String `tfsdk:"file_hash"`
 }
 
@@ -162,12 +163,12 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"visible": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Visibility of the file (1 = visible, 0 = hidden). Default: 1.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
+				Description: "Whether the file is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"file_hash": schema.StringAttribute{
@@ -197,9 +198,9 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 		displayName = filepath.Base(filePath)
 	}
 
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	// 1. Upload file
@@ -229,7 +230,7 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 
 	plan.ID = types.Int64Value(cmID)
 	plan.DisplayName = types.StringValue(displayName)
-	plan.Visible = types.Int64Value(visible)
+	plan.Visible = types.BoolValue(visible)
 
 	// Store hash in state; compute as fallback if plan modifier could not set it.
 	if plan.FileHash.IsNull() || plan.FileHash.IsUnknown() {

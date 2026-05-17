@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"terraform-moodle-provider/internal/moodle"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -32,7 +34,7 @@ type courseSectionResourceModel struct {
 	Name     types.String `tfsdk:"name"`
 	Summary  types.String `tfsdk:"summary"`
 	Section  types.Int64  `tfsdk:"section"`
-	Visible  types.Int64  `tfsdk:"visible"`
+	Visible  types.Bool   `tfsdk:"visible"`
 }
 
 func (r *courseSectionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -93,12 +95,12 @@ func (r *courseSectionResource) Schema(_ context.Context, _ resource.SchemaReque
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
-			"visible": schema.Int64Attribute{
+			"visible": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "Visibility of the section (1 = visible, 0 = hidden). Default: 1.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
+				Description: "Whether the section is visible to students. Default: true.",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -113,18 +115,17 @@ func (r *courseSectionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	// 1. Add new section to course (Moodle appends it to the end)
 	section, err := r.client.CreateSection(plan.CourseID.ValueInt64())
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating section", err.Error())
 		return
 	}
 
-	// 2. Set name and summary
 	summary := plan.Summary.ValueString()
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	err = r.client.EditSection(section.ID, plan.Name.ValueString(), summary, visible)
@@ -135,7 +136,7 @@ func (r *courseSectionResource) Create(ctx context.Context, req resource.CreateR
 
 	plan.ID = types.Int64Value(section.ID)
 	plan.Section = types.Int64Value(section.Section)
-	plan.Visible = types.Int64Value(visible)
+	plan.Visible = types.BoolValue(visible)
 	if plan.Summary.IsNull() || plan.Summary.IsUnknown() {
 		plan.Summary = types.StringValue("")
 	}
@@ -153,6 +154,10 @@ func (r *courseSectionResource) Read(ctx context.Context, req resource.ReadReque
 
 	section, err := r.client.GetSection(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading section", err.Error())
 		return
 	}
@@ -160,7 +165,7 @@ func (r *courseSectionResource) Read(ctx context.Context, req resource.ReadReque
 	state.Name = types.StringValue(section.Name)
 	state.Summary = types.StringValue(section.Summary)
 	state.Section = types.Int64Value(section.Section)
-	state.Visible = types.Int64Value(section.Visible)
+	state.Visible = types.BoolValue(section.Visible == 1)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -173,9 +178,9 @@ func (r *courseSectionResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	visible := plan.Visible.ValueInt64()
-	if plan.Visible.IsNull() || plan.Visible.IsUnknown() {
-		visible = 1
+	visible := true
+	if !plan.Visible.IsNull() && !plan.Visible.IsUnknown() {
+		visible = plan.Visible.ValueBool()
 	}
 
 	summary := plan.Summary.ValueString()
@@ -190,6 +195,7 @@ func (r *courseSectionResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	plan.Visible = types.BoolValue(visible)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

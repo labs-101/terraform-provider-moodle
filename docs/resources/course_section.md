@@ -30,7 +30,7 @@ resource "moodle_course_section" "introduction" {
 ### Optional
 
 - `summary` (String) The summary/description of the section (HTML is supported).
-- `visible` (Number) Visibility of the section (1 = visible, 0 = hidden). Default: 1.
+- `visible` (Boolean) Whether the section is visible to students. Default: true.
 
 ### Read-Only
 

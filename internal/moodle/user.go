@@ -3,7 +3,6 @@ package moodle
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -32,36 +31,23 @@ func (c *MoodleClient) CreateUser(username, password, firstname, lastname, email
 		params.Add("users[0][auth]", auth)
 	}
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("POST", reqURL, nil)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API error: %s", string(body))
+		return nil, fmt.Errorf("CreateUser: %w", err)
 	}
 
 	var users []User
-	err = json.Unmarshal(body, &users)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %w\nBody: %s", err, string(body))
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	if len(users) == 0 {
-		return nil, fmt.Errorf("moodle returned no user")
+		return nil, fmt.Errorf("CreateUser: moodle returned no user")
 	}
 
 	return &users[0], nil
@@ -75,36 +61,23 @@ func (c *MoodleClient) GetUser(userID int64) (*User, error) {
 	params.Add("field", "id")
 	params.Add("values[0]", fmt.Sprintf("%d", userID))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API error: %s", string(body))
+		return nil, fmt.Errorf("GetUser %d: %w", userID, err)
 	}
 
 	var users []User
-	err = json.Unmarshal(body, &users)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %w\nBody: %s", err, string(body))
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	if len(users) == 0 {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user with ID %d not found", userID)
 	}
 
 	return &users[0], nil
@@ -118,39 +91,49 @@ func (c *MoodleClient) GetUserByEmail(email string) (*User, error) {
 	params.Add("field", "email")
 	params.Add("values[0]", email)
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
+	body, err := c.doRequest(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return nil, fmt.Errorf("moodle API error: %s", string(body))
+		return nil, fmt.Errorf("GetUserByEmail %q: %w", email, err)
 	}
 
 	var users []User
-	err = json.Unmarshal(body, &users)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %w\nBody: %s", err, string(body))
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("parsing response: %w — body: %s", err, string(body))
 	}
 
 	if len(users) == 0 {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("user with email %q not found", email)
 	}
 
 	return &users[0], nil
+}
+
+func (c *MoodleClient) UpdateUser(userID int64, firstname, lastname, email string) error {
+	params := url.Values{}
+	params.Add("wstoken", c.Token)
+	params.Add("wsfunction", "core_user_update_users")
+	params.Add("moodlewsrestformat", "json")
+	params.Add("users[0][id]", fmt.Sprintf("%d", userID))
+	params.Add("users[0][firstname]", firstname)
+	params.Add("users[0][lastname]", lastname)
+	params.Add("users[0][email]", email)
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("UpdateUser %d: %w", userID, err)
+	}
+
+	return nil
 }
 
 func (c *MoodleClient) DeleteUser(userID int64) error {
@@ -160,26 +143,13 @@ func (c *MoodleClient) DeleteUser(userID int64) error {
 	params.Add("moodlewsrestformat", "json")
 	params.Add("userids[0]", fmt.Sprintf("%d", userID))
 
-	reqURL := fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode())
-
-	req, err := http.NewRequest("POST", reqURL, nil)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
-	res, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
-	}
-	defer res.Body.Close()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("error reading API response: %w", err)
-	}
-
-	if strings.Contains(string(body), "exception") {
-		return fmt.Errorf("moodle API error: %s", string(body))
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("DeleteUser %d: %w", userID, err)
 	}
 
 	return nil

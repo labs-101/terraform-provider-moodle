@@ -20,7 +20,7 @@ func TestAccCourseResource(t *testing.T) {
 					resource.TestCheckResourceAttr("moodle_course.test", "startdate", "2026-03-10"),
 					resource.TestCheckResourceAttr("moodle_course.test", "categoryid", "1"),
 					resource.TestCheckResourceAttr("moodle_course.test", "idnumber", "10000"),
-					resource.TestCheckResourceAttr("moodle_course.test", "visibility", "1"),
+					resource.TestCheckResourceAttr("moodle_course.test", "visible", "true"),
 					resource.TestCheckResourceAttr("moodle_course.test", "description", "test summary"),
 					resource.TestCheckResourceAttrSet("moodle_course.test", "id"),
 				),
@@ -37,7 +37,7 @@ resource "moodle_course" "test" {
   startdate  = "2026-03-10"
   categoryid = 1
   idnumber   = 10000
-  visibility = 1 # 1 = visible
+  visible    = true
   description    = "test summary"
 }
 `, name)

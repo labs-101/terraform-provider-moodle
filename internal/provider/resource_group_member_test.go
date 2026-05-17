@@ -49,7 +49,7 @@ resource "moodle_group" "gm_group" {
   course_id     = moodle_course.gm_course.id
   name          = "Test Group"
   visibility    = 0
-  participation = 1
+  participation = true
   enrolmentkey  = ""
   idnumber      = ""
 }
