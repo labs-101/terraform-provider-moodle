@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -94,31 +95,49 @@ func (r *sectionAssignmentResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Description: "Assignment description (HTML is supported).",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"duedate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Due date in format YYYY-MM-DD (e.g. 2026-06-30). Empty means no due date.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"allowsubmissionsfromdate": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Start date for submissions in format YYYY-MM-DD. Empty means immediately.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"maxbytes": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Maximum file size in bytes. 0 means unlimited.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"maxfilesubmissions": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Maximum number of file submissions. Default: 1.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"submissiontypes": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Submission types as comma-separated list. Possible values: onlinetext, file. Default: onlinetext.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"visible": schema.BoolAttribute{
 				Optional:    true,
