@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -24,30 +24,30 @@ var (
 	_ resource.ResourceWithConfigure = &sectionFileResource{}
 )
 
-// md5HashFile computes the MD5 hex digest of the file at the given path.
-func md5HashFile(filePath string) (string, error) {
+// sha256HashFile computes the SHA-256 hex digest of the file at the given path.
+func sha256HashFile(filePath string) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-	h := md5.New()
+	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-// autoHashPlanModifier automatically computes the MD5 hash from file_path
+// autoHashPlanModifier automatically computes the SHA-256 hash from file_path
 // when file_hash is not set by the user, and triggers replacement on change.
 type autoHashPlanModifier struct{}
 
 func (m autoHashPlanModifier) Description(_ context.Context) string {
-	return "Automatically computes the MD5 hash from file_path. Forces replacement when the hash changes."
+	return "Automatically computes the SHA-256 hash from file_path. Forces replacement when the hash changes."
 }
 
 func (m autoHashPlanModifier) MarkdownDescription(_ context.Context) string {
-	return "Automatically computes the MD5 hash from `file_path`. Forces replacement when the hash changes."
+	return "Automatically computes the SHA-256 hash from `file_path`. Forces replacement when the hash changes."
 }
 
 func (m autoHashPlanModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
@@ -63,11 +63,11 @@ func (m autoHashPlanModifier) PlanModifyString(ctx context.Context, req planmodi
 		if resp.Diagnostics.HasError() || filePath.IsNull() || filePath.IsUnknown() {
 			return
 		}
-		hash, err := md5HashFile(filePath.ValueString())
+		hash, err := sha256HashFile(filePath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddWarning(
 				"Could not auto-compute file hash",
-				fmt.Sprintf("Failed to compute MD5 of %q: %s. Set file_hash explicitly.", filePath.ValueString(), err),
+				fmt.Sprintf("Failed to compute SHA-256 of %q: %s. Set file_hash explicitly.", filePath.ValueString(), err),
 			)
 			return
 		}
@@ -174,7 +174,7 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"file_hash": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "MD5 hash of the file. If omitted, computed automatically from file_path. Changes force a re-upload.",
+				Description: "SHA-256 hash of the file. If omitted, computed automatically from file_path. Changes force a re-upload.",
 				PlanModifiers: []planmodifier.String{
 					autoHashPlanModifier{},
 				},
@@ -234,7 +234,7 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 
 	// Store hash in state; compute as fallback if plan modifier could not set it.
 	if plan.FileHash.IsNull() || plan.FileHash.IsUnknown() {
-		if hash, err := md5HashFile(filePath); err == nil {
+		if hash, err := sha256HashFile(filePath); err == nil {
 			plan.FileHash = types.StringValue(hash)
 		}
 	}
