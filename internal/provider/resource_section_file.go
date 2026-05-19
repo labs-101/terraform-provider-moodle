@@ -168,7 +168,7 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:    true,
 				Description: "Whether the file is visible to students. Default: true.",
 				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
+					boolplanmodifier.RequiresReplace(),
 				},
 			},
 			"file_hash": schema.StringAttribute{
@@ -267,15 +267,8 @@ func (r *sectionFileResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *sectionFileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All mutable attributes have RequiresReplace — Update never called.
-	// Sets state anyway to keep Terraform consistent.
-	var plan sectionFileResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+func (r *sectionFileResource) Update(_ context.Context, _ resource.UpdateRequest, _ *resource.UpdateResponse) {
+	// All attributes have RequiresReplace — Update is never called.
 }
 
 func (r *sectionFileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -87,6 +88,9 @@ func (r *sectionLabelResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Computed:    true,
 				Description: "Internal name of the label (not displayed to students). Defaults to an empty string.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"previous_element_id": schema.Int64Attribute{
 				Optional:    true,
@@ -178,7 +182,11 @@ func (r *sectionLabelResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	state.Name = types.StringValue(label.Name)
+	// Only reflect Moodle's name back if the user explicitly set one.
+	// When name is empty, Moodle auto-generates one from the description — we ignore that.
+	if state.Name.ValueString() != "" {
+		state.Name = types.StringValue(label.Name)
+	}
 	state.Description = types.StringValue(label.Intro)
 	state.Section = types.Int64Value(label.Section)
 	state.Visible = types.BoolValue(label.Visible)
