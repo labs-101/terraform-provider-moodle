@@ -3,20 +3,24 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"terraform-moodle-provider/internal/moodle"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
-	_ resource.Resource              = &userResource{}
-	_ resource.ResourceWithConfigure = &userResource{}
+	_ resource.Resource                = &userResource{}
+	_ resource.ResourceWithConfigure   = &userResource{}
+	_ resource.ResourceWithImportState = &userResource{}
 )
 
 func NewUserResource() resource.Resource {
@@ -72,6 +76,9 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"username": schema.StringAttribute{
 				Required:    true,
 				Description: "The username of the user.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"password": schema.StringAttribute{
 				Required:    true,
@@ -94,6 +101,9 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Computed:    true,
 				Description: "The authentication method of the user (default: manual).",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -108,7 +118,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	auth := "manual"
-	if !plan.Auth.IsNull() {
+	if !plan.Auth.IsNull() && !plan.Auth.IsUnknown() {
 		auth = plan.Auth.ValueString()
 	}
 
@@ -150,6 +160,10 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 	user, err := r.client.GetUser(state.ID.ValueInt64())
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading user", err.Error())
 		return
 	}
@@ -159,24 +173,77 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	state.Lastname = types.StringValue(user.Lastname)
 	state.Email = types.StringValue(user.Email)
 	state.Auth = types.StringValue(user.Auth)
-	// Password cannot be read back
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// core_user_update_users is not implemented in moodle client yet, and moodle create user usually doesn't update.
-	// For now we can return error or leave it empty if we don't support update.
-	// Or we can assume forces replacement if some fields change, but schema handles that if we set ForceNew on attributes.
-	// We didn't set ForceNew, so Terraform assumes Update is possible.
-	// Since I didn't implement UpdateUser in client, I should probably fail or assume it's not supported.
-	// But let's check if I can just implement it quickly or skip it.
-	// Given the prompt "add 10 students", Create is the most important.
-	// I'll leave Update empty but it might confuse Terraform if state changes.
-	// Actually, I should probably implement UpdateUser in user.go if I want to be compliant,
-	// but for this task I will just warn that update is not supported or implement it.
-	// Let's implement UpdateUser in user.go later if needed. For now, I'll return an error saying not supported.
-	resp.Diagnostics.AddError("Error updating user", "Update operation is not yet supported for Moodle users.")
+	var plan userResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var state userResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	auth := "manual"
+	if !plan.Auth.IsNull() && !plan.Auth.IsUnknown() {
+		auth = plan.Auth.ValueString()
+	}
+
+	tflog.Info(ctx, "Updating Moodle user", map[string]interface{}{
+		"user_id": state.ID.ValueInt64(),
+	})
+
+	err := r.client.UpdateUser(
+		state.ID.ValueInt64(),
+		plan.Username.ValueString(),
+		plan.Password.ValueString(),
+		plan.Firstname.ValueString(),
+		plan.Lastname.ValueString(),
+		plan.Email.ValueString(),
+		auth,
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating user", err.Error())
+		return
+	}
+
+	// Anchor state to what we sent so partial success is preserved in state
+	// even if the subsequent verification step fails.
+	plan.ID = state.ID
+	plan.Auth = types.StringValue(auth)
+
+	// Read back from Moodle to detect silent update failures (core_user_update_users
+	// returns null even when Moodle ignores a field change, e.g. due to email
+	// confirmation settings or missing capabilities).
+	updated, err := r.client.GetUser(state.ID.ValueInt64())
+	if err != nil {
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		resp.Diagnostics.AddError("Error verifying user update", err.Error())
+		return
+	}
+	if updated.Email != plan.Email.ValueString() {
+		// Store the actual email Moodle has so Terraform detects the ongoing drift
+		// and plans another update on the next apply.
+		wantedEmail := plan.Email.ValueString()
+		plan.Email = types.StringValue(updated.Email)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		resp.Diagnostics.AddError(
+			"User email was not updated",
+			fmt.Sprintf("Moodle did not apply the email change: got %q, want %q. "+
+				"Check that the webservice token has 'moodle/user:update' capability and that "+
+				"$CFG->emailchangeconfirmation is disabled.", updated.Email, wantedEmail),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -189,14 +256,31 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 	err := r.client.DeleteUser(state.ID.ValueInt64())
 	if err != nil {
-		// If the webservice does not have core_user_delete_users, treat as a warning
-		// and remove the resource from state so Terraform does not get stuck.
-		if strings.Contains(err.Error(), "accessexception") {
-			tflog.Warn(ctx, "User deletion skipped: core_user_delete_users not permitted on this webservice token. "+
-				"The user will remain in Moodle but has been removed from Terraform state.",
-				map[string]interface{}{"user_id": state.ID.ValueInt64()})
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "accessexception") {
+			tflog.Warn(ctx, "Moodle denied delete (accessexception); treating as already removed", map[string]interface{}{
+				"user_id": state.ID.ValueInt64(),
+			})
 			return
 		}
-		resp.Diagnostics.AddError("Error deleting user", err.Error())
+		if strings.Contains(errMsg, "not found") {
+			tflog.Warn(ctx, "User already deleted out-of-band; removing from state", map[string]interface{}{
+				"user_id": state.ID.ValueInt64(),
+			})
+			return
+		}
+		resp.Diagnostics.AddError("Error deleting user", errMsg)
 	}
+}
+
+func (r *userResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	id, err := strconv.ParseInt(req.ID, 10, 64)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid import ID",
+			fmt.Sprintf("Expected a numeric Moodle user ID, got %q: %s", req.ID, err),
+		)
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
 }

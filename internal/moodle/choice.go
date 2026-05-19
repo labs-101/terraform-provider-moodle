@@ -101,3 +101,34 @@ func (c *MoodleClient) AddChoiceToSection(courseID int64, sectionNum int64, name
 
 	return result.CMID, nil
 }
+
+// UpdateChoice updates an existing choice activity.
+func (c *MoodleClient) UpdateChoice(courseID, cmID int64, name, intro string, options []string, allowMultiple bool) error {
+	params := url.Values{}
+	params.Add("wstoken", c.Token)
+	params.Add("wsfunction", "local_course_api_update_choice")
+	params.Add("moodlewsrestformat", "json")
+	params.Add("courseid", fmt.Sprintf("%d", courseID))
+	params.Add("cmid", fmt.Sprintf("%d", cmID))
+	params.Add("name", name)
+	params.Add("intro", intro)
+	if allowMultiple {
+		params.Add("allowmultiple", "1")
+	} else {
+		params.Add("allowmultiple", "0")
+	}
+	for i, opt := range options {
+		params.Add(fmt.Sprintf("options[%d]", i), opt)
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/webservice/rest/server.php", c.Host), strings.NewReader(params.Encode()))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	if _, err := c.doRequest(req); err != nil {
+		return fmt.Errorf("UpdateChoice cm=%d: %w", cmID, err)
+	}
+	return nil
+}

@@ -7,10 +7,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -86,33 +84,21 @@ func (r *sectionChoiceResource) Schema(_ context.Context, _ resource.SchemaReque
 			"name": schema.StringAttribute{
 				Required:    true,
 				Description: "The display name of the Choice activity.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"description": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Description text of the Choice activity (HTML is supported).",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"options": schema.ListAttribute{
 				Required:    true,
 				ElementType: types.StringType,
 				Description: "List of options (at least 2).",
-				PlanModifiers: []planmodifier.List{
-					listRequiresReplace{},
-				},
 			},
 			"allow_multiple": schema.BoolAttribute{
 				Optional:    true,
 				Computed:    true,
 				Description: "Whether multiple selection is allowed. Default: false.",
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
 			},
 		},
 	}
@@ -126,7 +112,6 @@ func (r *sectionChoiceResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	// extract options from types.List
 	var options []string
 	resp.Diagnostics.Append(plan.Options.ElementsAs(ctx, &options, false)...)
 	if resp.Diagnostics.HasError() {
@@ -168,27 +153,58 @@ func (r *sectionChoiceResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	choice, err := r.client.GetChoice(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading Choice activity", err.Error())
 		return
 	}
 
-	if module == nil {
+	if choice == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	state.Name = types.StringValue(module.Name)
+	state.Name = types.StringValue(choice.Name)
+	state.Description = types.StringValue(choice.Intro)
+	state.AllowMultiple = types.BoolValue(choice.AllowMultiple)
+
+	opts, diags := types.ListValueFrom(ctx, types.StringType, choice.Options)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Options = opts
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *sectionChoiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan sectionChoiceResourceModel
+
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	var options []string
+	resp.Diagnostics.Append(plan.Options.ElementsAs(ctx, &options, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	err := r.client.UpdateChoice(
+		plan.CourseID.ValueInt64(),
+		plan.ID.ValueInt64(),
+		plan.Name.ValueString(),
+		plan.Description.ValueString(),
+		options,
+		plan.AllowMultiple.ValueBool(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating Choice activity", err.Error())
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -203,21 +219,4 @@ func (r *sectionChoiceResource) Delete(ctx context.Context, req resource.DeleteR
 	if err := r.client.DeleteCourseModule(state.ID.ValueInt64()); err != nil {
 		resp.Diagnostics.AddError("Fehler beim Löschen der Choice-Aktivität", err.Error())
 	}
-}
-
-// listRequiresReplace ist ein einfacher PlanModifier für Listen, der bei Änderungen einen Replace erzwingt.
-type listRequiresReplace struct{}
-
-func (m listRequiresReplace) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
-	if !req.PlanValue.Equal(req.StateValue) {
-		resp.RequiresReplace = true
-	}
-}
-
-func (m listRequiresReplace) Description(ctx context.Context) string {
-	return "Erzwingt eine Neuanlage wenn sich die Liste ändert."
-}
-
-func (m listRequiresReplace) MarkdownDescription(ctx context.Context) string {
-	return "Erzwingt eine Neuanlage wenn sich die Liste ändert."
 }
