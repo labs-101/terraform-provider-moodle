@@ -14,6 +14,7 @@ func TestAccGroupMemberResource(t *testing.T) {
 				Config: testAccGroupMemberConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("moodle_group_member.test", "id"),
+					resource.TestCheckResourceAttrSet("moodle_group_member.test", "course_id"),
 					resource.TestCheckResourceAttrSet("moodle_group_member.test", "group_id"),
 					resource.TestCheckResourceAttrSet("moodle_group_member.test", "user_id"),
 				),
@@ -55,6 +56,7 @@ resource "moodle_group" "gm_group" {
 }
 
 resource "moodle_group_member" "test" {
+  course_id  = moodle_course.gm_course.id
   group_id   = moodle_group.gm_group.id
   user_id    = moodle_user.gm_user.id
   depends_on = [moodle_user_enrolment.gm_enrol]

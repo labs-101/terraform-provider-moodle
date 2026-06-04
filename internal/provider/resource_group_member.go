@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"terraform-moodle-provider/internal/moodle"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -27,9 +28,10 @@ type groupMemberResource struct {
 }
 
 type groupMemberResourceModel struct {
-	ID      types.String `tfsdk:"id"`
-	GroupID types.Int64  `tfsdk:"group_id"`
-	UserID  types.Int64  `tfsdk:"user_id"`
+	ID       types.String `tfsdk:"id"`
+	CourseID types.Int64  `tfsdk:"course_id"`
+	GroupID  types.Int64  `tfsdk:"group_id"`
+	UserID   types.Int64  `tfsdk:"user_id"`
 }
 
 func (r *groupMemberResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -62,6 +64,13 @@ func (r *groupMemberResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "Composite ID of the group membership (groupid-userid).",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"course_id": schema.Int64Attribute{
+				Required:    true,
+				Description: "The ID of the course the group belongs to.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"group_id": schema.Int64Attribute{
@@ -108,7 +117,18 @@ func (r *groupMemberResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// No dedicated read endpoint — keep existing state.
+	members, err := r.client.GetGroupMembers(state.CourseID.ValueInt64(), state.GroupID.ValueInt64())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading group members", err.Error())
+		return
+	}
+
+	if !slices.Contains(members, state.UserID.ValueInt64()) {
+		// The user is no longer a member of the group — drop it from state so it gets recreated.
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

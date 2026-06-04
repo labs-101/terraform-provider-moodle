@@ -24,6 +24,7 @@ resource "moodle_group_member" "jane_in_one" {
 
 ### Required
 
+- `course_id` (Number) The ID of the course the group belongs to.
 - `group_id` (Number) The ID of the group.
 - `user_id` (Number) The ID of the user to add to the group.
 
