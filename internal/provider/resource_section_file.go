@@ -2,7 +2,7 @@ package provider
 
 import (
 	"context"
-	"crypto/sha256"
+	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
@@ -24,14 +24,16 @@ var (
 	_ resource.ResourceWithConfigure = &sectionFileResource{}
 )
 
-// sha256HashFile computes the SHA-256 hex digest of the file at the given path.
-func sha256HashFile(filePath string) (string, error) {
+// sha1HashFile computes the SHA-1 hex digest of the file at the given path.
+// SHA-1 is used (not SHA-256) so the value matches Moodle's file content hash
+// (mdl_files.contenthash), allowing remote drift to be detected by comparison.
+func sha1HashFile(filePath string) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-	h := sha256.New()
+	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
@@ -63,11 +65,11 @@ func (m autoHashPlanModifier) PlanModifyString(ctx context.Context, req planmodi
 		if resp.Diagnostics.HasError() || filePath.IsNull() || filePath.IsUnknown() {
 			return
 		}
-		hash, err := sha256HashFile(filePath.ValueString())
+		hash, err := sha1HashFile(filePath.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddWarning(
 				"Could not auto-compute file hash",
-				fmt.Sprintf("Failed to compute SHA-256 of %q: %s. Set file_hash explicitly.", filePath.ValueString(), err),
+				fmt.Sprintf("Failed to compute SHA-1 of %q: %s. Set file_hash explicitly.", filePath.ValueString(), err),
 			)
 			return
 		}
@@ -79,6 +81,44 @@ func (m autoHashPlanModifier) PlanModifyString(ctx context.Context, req planmodi
 	// Trigger replacement when hash changed from stored state.
 	if !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
 		if req.StateValue.ValueString() != computedHash {
+			resp.RequiresReplace = true
+		}
+	}
+}
+
+// autoFileSizePlanModifier tracks the byte size of the local file at file_path.
+// It forces replacement when the size stored in state (refreshed from Moodle in
+// Read) differs from the local file — i.e. a different file was uploaded to Moodle
+// outside of Terraform, or the local file was swapped for one of a different size.
+type autoFileSizePlanModifier struct{}
+
+func (m autoFileSizePlanModifier) Description(_ context.Context) string {
+	return "Tracks the local file size and forces replacement when the file in Moodle differs."
+}
+
+func (m autoFileSizePlanModifier) MarkdownDescription(_ context.Context) string {
+	return "Tracks the local file size and forces replacement when the file in Moodle differs."
+}
+
+func (m autoFileSizePlanModifier) PlanModifyInt64(ctx context.Context, req planmodifier.Int64Request, resp *planmodifier.Int64Response) {
+	var filePath types.String
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("file_path"), &filePath)...)
+	if resp.Diagnostics.HasError() || filePath.IsNull() || filePath.IsUnknown() {
+		return
+	}
+
+	info, err := os.Stat(filePath.ValueString())
+	if err != nil {
+		// Can't determine the local size — leave the planned value untouched.
+		return
+	}
+	localSize := info.Size()
+
+	resp.PlanValue = types.Int64Value(localSize)
+
+	// Trigger replacement when the size in Moodle no longer matches the local file.
+	if !req.StateValue.IsNull() && !req.StateValue.IsUnknown() {
+		if req.StateValue.ValueInt64() != localSize {
 			resp.RequiresReplace = true
 		}
 	}
@@ -100,6 +140,7 @@ type sectionFileResourceModel struct {
 	DisplayName types.String `tfsdk:"display_name"`
 	Visible     types.Bool   `tfsdk:"visible"`
 	FileHash    types.String `tfsdk:"file_hash"`
+	FileSize    types.Int64  `tfsdk:"file_size"`
 }
 
 func (r *sectionFileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -174,9 +215,16 @@ func (r *sectionFileResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"file_hash": schema.StringAttribute{
 				Optional:    true,
 				Computed:    true,
-				Description: "SHA-256 hash of the file. If omitted, computed automatically from file_path. Changes force a re-upload.",
+				Description: "SHA-1 content hash of the file (matches Moodle's file storage hash). If omitted, computed automatically from file_path. A mismatch — whether the local file changed or a different file was uploaded to Moodle — forces a re-upload.",
 				PlanModifiers: []planmodifier.String{
 					autoHashPlanModifier{},
+				},
+			},
+			"file_size": schema.Int64Attribute{
+				Computed:    true,
+				Description: "Size of the uploaded file in bytes, as reported by Moodle. If the size in Moodle no longer matches the local file (e.g. a different file was uploaded outside Terraform), the resource is replaced.",
+				PlanModifiers: []planmodifier.Int64{
+					autoFileSizePlanModifier{},
 				},
 			},
 		},
@@ -203,19 +251,16 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 		visible = plan.Visible.ValueBool()
 	}
 
-	// 1. Upload file
 	itemID, filename, err := r.client.UploadFile(filePath)
 	if err != nil {
 		resp.Diagnostics.AddError("Error uploading file", err.Error())
 		return
 	}
 
-	// display_name: prefer user input, fallback to uploaded filename
 	if plan.DisplayName.IsNull() || plan.DisplayName.IsUnknown() || plan.DisplayName.ValueString() == "" {
 		displayName = filename
 	}
 
-	// 2. Link file to section
 	cmID, err := r.client.AddFileToSection(
 		plan.CourseID.ValueInt64(),
 		plan.Section.ValueInt64(),
@@ -232,10 +277,19 @@ func (r *sectionFileResource) Create(ctx context.Context, req resource.CreateReq
 	plan.DisplayName = types.StringValue(displayName)
 	plan.Visible = types.BoolValue(visible)
 
-	// Store hash in state; compute as fallback if plan modifier could not set it.
+	// Store hash in state compute as fallback if plan modifier could not set it.
 	if plan.FileHash.IsNull() || plan.FileHash.IsUnknown() {
-		if hash, err := sha256HashFile(filePath); err == nil {
+		if hash, err := sha1HashFile(filePath); err == nil {
 			plan.FileHash = types.StringValue(hash)
+		}
+	}
+
+	// Record the local file size; right after upload it matches Moodle's copy.
+	if plan.FileSize.IsNull() || plan.FileSize.IsUnknown() {
+		if info, err := os.Stat(filePath); err == nil {
+			plan.FileSize = types.Int64Value(info.Size())
+		} else {
+			plan.FileSize = types.Int64Value(0)
 		}
 	}
 
@@ -250,19 +304,34 @@ func (r *sectionFileResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	module, err := r.client.GetCourseModule(state.CourseID.ValueInt64(), state.ID.ValueInt64())
+	file, err := r.client.GetResourceFile(state.CourseID.ValueInt64(), state.ID.ValueInt64())
 	if err != nil {
-		resp.Diagnostics.AddError("Error reading course module", err.Error())
+		resp.Diagnostics.AddError("Error reading file resource", err.Error())
 		return
 	}
 
-	// Module was deleted externally — remove state
-	if module == nil {
+	// Activity was deleted externally — remove state
+	if file == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	state.DisplayName = types.StringValue(module.Name)
+	// Refresh tracked attributes so configuration/content drift is detected.
+	state.DisplayName = types.StringValue(file.Name)
+	state.Visible = types.BoolValue(file.Visible)
+
+	// Refresh the content hash from Moodle (SHA-1). A mismatch with the local file's
+	// hash makes the file_hash plan modifier force a replacement — this catches both
+	// a changed local file and a different file uploaded to Moodle out-of-band.
+	if file.ContentHash != "" {
+		state.FileHash = types.StringValue(file.ContentHash)
+	}
+
+	// Keep the file size in sync as a secondary signal. Guard against transient
+	// empty responses that would otherwise cause a spurious replacement.
+	if file.FileSize > 0 {
+		state.FileSize = types.Int64Value(file.FileSize)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

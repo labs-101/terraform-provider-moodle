@@ -14,14 +14,74 @@ import (
 )
 
 type CourseModule struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	ModType string `json:"modname"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	ModType  string `json:"modname"`
+	Visible  bool   `json:"-"`
+	FileSize int64  `json:"-"` // total size in bytes of the module's files (0 if it has none)
 }
 
 type uploadFileResponse struct {
 	ItemID   int64  `json:"itemid"`
 	Filename string `json:"filename"`
+}
+
+// ResourceFile holds the details of a single-file resource activity, including
+// the SHA-1 content hash Moodle stores for the underlying file.
+type ResourceFile struct {
+	CMID        int64
+	Name        string
+	Visible     bool
+	FileName    string
+	FileSize    int64
+	ContentHash string
+}
+
+// GetResourceFile returns the stored file of a resource activity. It returns
+// (nil, nil) when the activity no longer exists, so callers can drop it from state.
+func (c *MoodleClient) GetResourceFile(courseID, cmID int64) (*ResourceFile, error) {
+	params := url.Values{}
+	params.Add("wstoken", c.Token)
+	params.Add("wsfunction", "local_courseapi_get_resource_file")
+	params.Add("moodlewsrestformat", "json")
+	params.Add("courseid", fmt.Sprintf("%d", courseID))
+	params.Add("cmid", fmt.Sprintf("%d", cmID))
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("GetResourceFile course=%d cm=%d: %w", courseID, cmID, err)
+	}
+
+	var raw struct {
+		Found       bool   `json:"found"`
+		CMID        int64  `json:"cmid"`
+		Name        string `json:"name"`
+		Visible     int64  `json:"visible"`
+		FileName    string `json:"filename"`
+		FileSize    int64  `json:"filesize"`
+		ContentHash string `json:"contenthash"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("parsing resource file: %w — body: %s", err, string(body))
+	}
+
+	if !raw.Found {
+		return nil, nil
+	}
+
+	return &ResourceFile{
+		CMID:        raw.CMID,
+		Name:        raw.Name,
+		Visible:     raw.Visible == 1,
+		FileName:    raw.FileName,
+		FileSize:    raw.FileSize,
+		ContentHash: raw.ContentHash,
+	}, nil
 }
 
 func (c *MoodleClient) UploadFile(filePath string) (int64, string, error) {
