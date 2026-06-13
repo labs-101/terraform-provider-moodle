@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"terraform-moodle-provider/internal/moodle"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
@@ -13,6 +14,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// choiceObjectType describes the structure of a single "choice" nested block,
+// used when (re)building the choice list from API responses.
+var choiceObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"answer":   types.StringType,
+		"grade":    types.Float64Type,
+		"feedback": types.StringType,
+	},
+}
 
 var (
 	_ resource.Resource              = &quizQuestionResource{}
@@ -221,7 +232,41 @@ func (r *quizQuestionResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// Keep state as-is since the Moodle plugin does not provide a dedicated read endpoint for questions.
+	question, err := r.client.GetQuestion(
+		state.CourseID.ValueInt64(),
+		state.QuizID.ValueInt64(),
+		state.ID.ValueInt64(),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading question", err.Error())
+		return
+	}
+
+	// The plugin resolves the question to its latest version, so refresh the ID
+	// to keep subsequent updates/deletes pointed at the current version.
+	state.ID = types.Int64Value(question.QuestionID)
+	state.Name = types.StringValue(question.Name)
+	state.Type = types.StringValue(question.Type)
+	state.QuestionText = types.StringValue(question.QuestionText)
+	state.Slot = types.Int64Value(question.Slot)
+	state.Page = types.Int64Value(question.Page)
+
+	choiceModels := make([]choiceModel, 0, len(question.Choices))
+	for _, c := range question.Choices {
+		choiceModels = append(choiceModels, choiceModel{
+			Answer:   types.StringValue(c.Answer),
+			Grade:    types.Float64Value(c.Grade),
+			Feedback: types.StringValue(c.Feedback),
+		})
+	}
+
+	choiceList, diags := types.ListValueFrom(ctx, choiceObjectType, choiceModels)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Choice = choiceList
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

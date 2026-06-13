@@ -26,6 +26,55 @@ type DeleteQuestionResponse struct {
 	Message string `json:"message"`
 }
 
+// QuestionChoice is a single answer option of a (multichoice) question.
+type QuestionChoice struct {
+	Answer   string  `json:"answer"`
+	Grade    float64 `json:"grade"`
+	Feedback string  `json:"feedback"`
+}
+
+// Question holds the full details of a quiz question as returned by the read endpoint.
+type Question struct {
+	QuestionID   int64            `json:"questionid"`
+	QuizID       int64            `json:"quizid"`
+	Name         string           `json:"name"`
+	Type         string           `json:"type"`
+	QuestionText string           `json:"questiontext"`
+	Choices      []QuestionChoice `json:"choices"`
+	Slot         int64            `json:"slot"`
+	Page         int64            `json:"page"`
+}
+
+// GetQuestion fetches the current details of a question within a quiz. The Moodle
+// plugin resolves the question to its latest version, so the returned QuestionID may
+// differ from the one passed in after the question has been edited.
+func (c *MoodleClient) GetQuestion(courseID, quizID, questionID int64) (*Question, error) {
+	params := url.Values{}
+	params.Add("wstoken", c.Token)
+	params.Add("wsfunction", "local_courseapi_get_question")
+	params.Add("moodlewsrestformat", "json")
+	params.Add("courseid", fmt.Sprintf("%d", courseID))
+	params.Add("quizid", fmt.Sprintf("%d", quizID))
+	params.Add("questionid", fmt.Sprintf("%d", questionID))
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/webservice/rest/server.php?%s", c.Host, params.Encode()), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("GetQuestion question=%d: %w", questionID, err)
+	}
+
+	var result Question
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parsing question: %w — body: %s", err, string(body))
+	}
+
+	return &result, nil
+}
+
 func (c *MoodleClient) AddQuestionToQuiz(
 	courseID int64,
 	name string,
